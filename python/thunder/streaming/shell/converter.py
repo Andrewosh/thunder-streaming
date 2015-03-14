@@ -1,5 +1,8 @@
 from thunder.streaming.shell.analysis import Analysis
+from abc import abstractmethod
 from numpy import array
+from threading import Thread
+import os
 
 # TODO Fix up comment
 """
@@ -37,14 +40,6 @@ analysis1 = Analysis.ExampleAnalysis(param1=value1, param2=value2...).seriesToIm
 
 """
 
-def converter(func):
-    """
-    :param func: A function with a single parameter type, Analysis, that must return an Analysis
-    :return: The function after it's been added to Analysis' dict
-    """
-    Analysis.__dict__[func.func_name] = func
-    return func
-
 
 class Data(object):
     """
@@ -54,48 +49,94 @@ class Data(object):
     # converted defines the type-specific output function
     converted = Analysis.ExampleAnalysis(...).toSeries()
 
+    Retains a reference to the Analysis that created it with self.analysis (this is used to start the Analysis
+    thread)
     """
-    pass
+    def __init__(self, analysis):
+        self.analysis = analysis
+        # Output functions are added to output_funcs with the @output decorator
+        self.output_funcs = {}
+
+    @staticmethod
+    def output(func):
+        def add_to_output(self):
+            self.output_funcs[func.func_name] = func
+        return add_to_output
+
+    @staticmethod
+    def converter(func):
+        """
+        :param func: A function with a single parameter type, Analysis, that must return an instance of Data
+        :return: The function after it's been added to Analysis' dict
+        """
+        def add_output(analysis):
+            analysis.outputs.append(func(analysis))
+        Analysis.__dict__[func.func_name] = add_output
+        return func
+
+    @abstractmethod
+    def _convert(self):
+        """
+        """
+        pass
+
+    def handle_new_data(self, new_data):
+        converted = self._convert(new_data)
+        for func in self.output_funcs.values():
+            func(converted)
+
+    def start(self):
+        self.analysis.start()
+
+    def stop(self):
+        self.analysis.stop()
 
 
 # Some example Converters for StreamingSeries
 
 class Series(Data):
 
-    def __init__(self, nparray):
-        self.array = nparray
-
-    @converter
     @staticmethod
+    @Data.converter
     def toSeries(analysis):
         """
         :param analysis: The analysis whose raw output will be parsed and converted into an in-memory series
         :return: A Series object
         """
-        output_dir = analysis.output_loc
+        return Series(analysis)
 
-
-    def toLightningServer(self):
+    def _convert(self, new_data):
         pass
 
-    def toFile(self, path):
-        pass
+    @Data.output
+    def toLightningServer(self, data):
+        return self
+
+    @Data.output
+    def toFile(self, path, data):
+        return self
 
 
 class Image(Data):
 
-    @converter
     @staticmethod
+    @Data.converter
     def toImage(analysis):
         """
         :param analysis: The analysis whose raw output will be parsed and converted into an in-memory image
         :return: An Image object
         """
+        return Image(analysis)
 
-    def toLightningServer(self):
+    def _convert(self, new_data):
         pass
 
-    def toFile(self, path):
+    @Data.output
+    def toLightningServer(self, data):
+        pass
+
+    @Data.output
+    def toFile(self, path, data):
         pass
 
 

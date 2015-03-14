@@ -201,6 +201,9 @@ class ThunderStreamingContext(ParamListener):
 
     def _start_children(self):
 
+        print "Starting the Analysis threads."
+        self._start_analyses()
+
         print "Starting the streaming analyses with run configuration:"
         print self
         self._start_streaming_child()
@@ -248,6 +251,10 @@ class ThunderStreamingContext(ParamListener):
                 os.remove(path)
 
         self.feeder_child = Popen(cmd)
+
+    def _start_analyses(self):
+        for analysis in self.analyses.values():
+            analysis.start()
 
     def _start_streaming_child(self):
         """
@@ -298,6 +305,8 @@ class ThunderStreamingContext(ParamListener):
         if self.state != self.STARTED:
             print "You can only stop a job that's currently running. Call ThunderStreamingContext.start() first."
             return
+        for analysis in self.analyses.values():
+            analysis.stop()
         self._kill_children()
         # If execution reaches this point, then an analysis which was previously started has been stopped. Since it can
         # be restarted immediately, the new state is READY
