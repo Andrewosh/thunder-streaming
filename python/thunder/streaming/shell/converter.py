@@ -140,8 +140,9 @@ class Series(Data):
         return records.keys(), records.values()
 
     @Data.output
-    def toLightningServer(self, lgn, data):
-        return self
+    def toLightning(self, lgn, data):
+        # TODO: just debugging for now
+        print "In toLightningServer, data: %s" % str(data)
 
     @Data.output
     def toFile(self, path, data):
@@ -163,7 +164,7 @@ class Image(Data):
         pass
 
     @Data.output
-    def toLightningServer(self, lgn, data):
+    def toLightning(self, lgn, data):
         pass
 
     @Data.output
