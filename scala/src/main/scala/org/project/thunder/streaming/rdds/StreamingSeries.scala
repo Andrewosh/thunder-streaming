@@ -42,7 +42,7 @@ class StreamingSeries(val dstream: DStream[(Int, Array[Double])])
 
       // Write out the dimensions file
       val dims = Map[String, String](
-        ("record_size", rdd.first()._2.length.toString),
+        ("record_size", if (rdd.count() != 0) rdd.first()._2.length.toString else 0,
         ("dtype", "float64")
       ).toJson
       val pw = new PrintWriter(new File(subDir, "dimensions.json"))
