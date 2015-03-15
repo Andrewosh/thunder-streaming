@@ -107,7 +107,7 @@ class Analysis(MappedScalaClass, ParamListener):
         return self.output_dir
 
     def get_outputs(self):
-        return self.output
+        return self.outputs
 
     def add_output(self, output):
         self.outputs[output.identifier] = output
