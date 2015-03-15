@@ -1,8 +1,10 @@
 from thunder.streaming.shell.analysis import Analysis
 from abc import abstractmethod
-from numpy import array
-from threading import Thread
+import numpy as np
+import re
 import os
+import json
+from collections import OrderedDict
 
 # TODO Fix up comment
 """
@@ -75,9 +77,7 @@ class Data(object):
         return func
 
     @abstractmethod
-    def _convert(self):
-        """
-        """
+    def _convert(self, root, new_data):
         pass
 
     def handle_new_data(self, new_data):
@@ -96,6 +96,11 @@ class Data(object):
 
 class Series(Data):
 
+    DIMS_FILE_NAME = "dimensions.json"
+    RECORD_SIZE = "record_size"
+    DTYPE = "dtype"
+    DIMS_PATTERN = re.compile(DIMS_FILE_NAME)
+
     @staticmethod
     @Data.converter
     def toSeries(analysis):
@@ -105,8 +110,34 @@ class Series(Data):
         """
         return Series(analysis)
 
-    def _convert(self, new_data):
-        pass
+    def _convert(self, root, new_data):
+        # Load in the dimension JSON file (which we assume exists in the results directory)
+        record_size, dtype = None, None
+        records = OrderedDict()
+
+        try:
+            dims = open(os.path.join(root, Series.DIMS_FILE_NAME), 'r')
+            dims_json = json.load(dims)
+            record_size = dims_json[self.RECORD_SIZE]
+            dtype = dims_json[self.DTYPE]
+        except Exception as e:
+            print "Cannot load binary series: %s" % str(e)
+        if not record_size or not dtype:
+            return
+
+        for f in new_data:
+            # Make sure to exclude the dimensions file
+            if not f.search(self.DIMS_FILE_NAME):
+                # Load each line according to record_size and dtype
+                fbuf = open(f, 'rb').read()
+                fsize = len(fbuf)
+                ptr = 0
+                while fsize - ptr != 0:
+                    idx = int(fbuf[ptr:ptr + 4])
+                    buf = np.frombuffer(fbuf, dtype=dtype, count=record_size, offset=ptr + 4)
+                    records[idx] = buf
+
+        return records.keys(), records.values()
 
     @Data.output
     def toLightningServer(self, lgn, data):
@@ -128,7 +159,7 @@ class Image(Data):
         """
         return Image(analysis)
 
-    def _convert(self, new_data):
+    def _convert(self, root, new_data):
         pass
 
     @Data.output

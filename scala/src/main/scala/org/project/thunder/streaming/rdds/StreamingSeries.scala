@@ -1,5 +1,7 @@
 package org.project.thunder.streaming.rdds
 
+import java.io.{PrintWriter, BufferedWriter, File}
+
 import org.apache.spark.TaskContext
 import org.apache.spark.streaming.Seconds
 import org.apache.spark.streaming.dstream.DStream
@@ -7,6 +9,9 @@ import org.apache.spark.streaming.StreamingContext._
 
 import org.project.thunder.streaming.util.counters.StatUpdater
 import org.project.thunder.streaming.util.io.{BinaryWriter, TextWriter}
+
+import spray.json._
+import DefaultJsonProtocol._
 
 class StreamingSeries(val dstream: DStream[(Int, Array[Double])])
   extends StreamingData[Array[Double], StreamingSeries] {
@@ -29,8 +34,21 @@ class StreamingSeries(val dstream: DStream[(Int, Array[Double])])
 
   /** Save to output files */
   def save(directory: String, prefix: String): Unit = {
-    val writer = new BinaryWriter(directory, prefix)
     dstream.foreachRDD{ (rdd, time) =>
+
+      val dirSize = new File(directory).list().length
+      val subDir = directory + "/" + dirSize.toString
+      val writer = new BinaryWriter(subDir, prefix)
+
+      // Write out the dimensions file
+      val dims = Map(
+        "record_size" -> rdd.first()._2.length,
+        "dtype" -> "float64"
+      ).toJson
+      val pw = new PrintWriter(new File(subDir, "dimensions.json"))
+      pw.print(dims)
+      pw.close()
+
       val writeShard = (context: TaskContext, part: Iterator[(Int, Array[Double])]) => {
         writer.withKeys(part, time, context.partitionId)
       }
