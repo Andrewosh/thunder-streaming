@@ -38,6 +38,7 @@ class StreamingSeries(val dstream: DStream[(Int, Array[Double])])
 
       val dirSize = new File(directory).list().length
       val subDir = directory + "/" + dirSize.toString
+      new File(subDir).mkdir()
       val writer = new BinaryWriter(subDir, prefix)
 
       // Write out the dimensions file
