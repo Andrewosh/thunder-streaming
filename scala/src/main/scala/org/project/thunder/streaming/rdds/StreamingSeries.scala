@@ -35,17 +35,19 @@ class StreamingSeries(val dstream: DStream[(Int, Array[Double])])
   /** Save to output files */
   def save(directory: String, prefix: String): Unit = {
 
-    val dirSize = new File(directory).list().length
-    val subDir = directory + "/" + dirSize.toString
-    new File(subDir).mkdir()
-
     dstream.foreachRDD{ (rdd, time) =>
+
+      val dirSize = new File(directory).list().length
+      val subDir = directory + "/" + dirSize.toString
+      new File(subDir).mkdir()
+
       val writer = new BinaryWriter(subDir, prefix)
       // Write out the dimensions file
       val dims = Map[String, String](
         ("record_size", (if (rdd.count() != 0) rdd.first()._2.length else 0).toString),
         ("dtype", "float64")
       ).toJson
+
       val pw = new PrintWriter(new File(subDir, "dimensions.json"))
       pw.print(dims.toString())
       pw.close()
