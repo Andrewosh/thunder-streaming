@@ -3,6 +3,7 @@ from thunder.streaming.shell.param_listener import ParamListener
 import settings
 from threading import Thread
 import time
+import os
 
 
 class Analysis(MappedScalaClass, ParamListener):
