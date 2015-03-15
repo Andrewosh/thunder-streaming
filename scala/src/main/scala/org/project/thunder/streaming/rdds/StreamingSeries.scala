@@ -46,7 +46,7 @@ class StreamingSeries(val dstream: DStream[(Int, Array[Double])])
         ("dtype", "float64")
       ).toJson
       val pw = new PrintWriter(new File(subDir, "dimensions.json"))
-      pw.print(dims)
+      pw.print(dims.toString())
       pw.close()
 
       val writeShard = (context: TaskContext, part: Iterator[(Int, Array[Double])]) => {

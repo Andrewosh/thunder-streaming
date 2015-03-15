@@ -264,7 +264,7 @@ class ThunderStreamingContext(ParamListener):
         spark_path = os.path.join(SPARK_HOME, "bin", "spark-submit")
         base_args = [spark_path, "--jars",
                      ",".join([os.path.join(THUNDER_STREAMING_PATH, "scala/project/lib/jeromq-0.3.4.jar"),
-                     os.path.join(THUNDER_STREAMING_PATH, "scala/project/lib/spray-json_2.11-1.3.1.jar")]),
+                     os.path.join(THUNDER_STREAMING_PATH, "scala/project/lib/spray-json_2.10-1.3.1.jar")]),
                      "--class", "org.project.thunder.streaming.util.launch.Launcher", full_jar]
         self.streamer_child = Popen(base_args)
 
