@@ -1,8 +1,8 @@
 from thunder.streaming.shell.analysis import Analysis
-from thunder.streaming.shell.output import Output
 from thunder.streaming.shell.param_listener import ParamListener
 from thunder.streaming.shell.message_proxy import MessageProxy
 from thunder.streaming.shell.settings import *
+from thunder.streaming.shell.converter import *
 
 import signal
 import re
