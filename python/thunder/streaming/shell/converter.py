@@ -68,6 +68,7 @@ class Data(object):
     def output(func):
         def add_to_output(self, *args):
             self.output_funcs[func.func_name] = lambda data: func(self, data, *args)
+            return self.analysis
         return add_to_output
 
     @staticmethod
