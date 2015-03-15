@@ -31,6 +31,7 @@ class Analysis(MappedScalaClass, ParamListener):
         FILE_POLL_PERIOD = 1
 
         def __init__(self, analysis):
+            Thread.__init__(self)
             self.output_dir = analysis.get_output_dir()
             self.outputs = analysis.get_outputs()
             self._stopped = False
