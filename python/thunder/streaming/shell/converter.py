@@ -79,7 +79,7 @@ class Data(object):
         def add_output(analysis):
             analysis.outputs.append(func(analysis))
         print "Adding %s to Analysis.__dict__" % func.func_name
-        Analysis.__dict__[func.func_name] = add_output
+        setattr(Analysis.__dict__, func.func_name, add_output)
         return func
 
     @abstractmethod
