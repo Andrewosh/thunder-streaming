@@ -32,7 +32,7 @@ class Analysis(MappedScalaClass, ParamListener):
 
         def __init__(self, analysis):
             self.output_dir = analysis.get_output_dir()
-            self.converters = analysis.get_outputs()
+            self.outputs = analysis.get_outputs()
             self._stopped = False
 
             # Fields involved in directory monitoring
@@ -109,8 +109,8 @@ class Analysis(MappedScalaClass, ParamListener):
     def get_outputs(self):
         return self.output
 
-    def add_converter(self, converter):
-        self.converters[converter.identifier] = converter
+    def add_output(self, output):
+        self.outputs[output.identifier] = output
 
     def receive_updates(self, analysis):
         """

@@ -54,6 +54,11 @@ class Data(object):
     Retains a reference to the Analysis that created it with self.analysis (this is used to start the Analysis
     thread)
     """
+
+    @property
+    def identifier(self):
+        return self.__class__.__name__
+
     def __init__(self, analysis):
         self.analysis = analysis
         # Output functions are added to output_funcs with the @output decorator
