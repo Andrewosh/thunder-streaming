@@ -109,7 +109,7 @@ class Series(Data):
         pass
 
     @Data.output
-    def toLightningServer(self, data):
+    def toLightningServer(self, lgn, data):
         return self
 
     @Data.output
@@ -132,7 +132,7 @@ class Image(Data):
         pass
 
     @Data.output
-    def toLightningServer(self, data):
+    def toLightningServer(self, lgn, data):
         pass
 
     @Data.output
