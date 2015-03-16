@@ -73,8 +73,9 @@ class Analysis(MappedScalaClass, ParamListener):
                 if dp > self.DIR_POLL_PERIOD:
                     cur_dir_state = self._qualified_dir_set(self.output_dir)
                     if cur_dir_state != self._last_dir_state:
-                        diff = cur_dir_state.difference(self._last_dir_state)
-                        self._start_monitoring(diff)
+                        if self._last_dir_state != None:
+                            diff = cur_dir_state.difference(self._last_dir_state)
+                            self._start_monitoring(diff)
                         self._last_dir_state = cur_dir_state
                     self.last_dir_poll = cur_time
                 for dir, info in self.monitored_dirs.items():
