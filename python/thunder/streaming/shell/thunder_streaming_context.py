@@ -197,7 +197,8 @@ class ThunderStreamingContext(ParamListener):
 
     def _kill_children(self):
         self._kill_child(self.streamer_child, "Streaming server")
-        self._kill_child(self.feeder_child, "Feeder process")
+        if self.feeder_child:
+            self._kill_child(self.feeder_child, "Feeder process")
 
     def _start_children(self):
 
