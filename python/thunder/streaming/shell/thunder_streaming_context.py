@@ -303,11 +303,7 @@ class ThunderStreamingContext(ParamListener):
                 return
 
         self._start_children()
-
         self.state = self.STARTED
-        # Spin until a SIGTERM or a SIGINT is received
-        while self.state == self.STARTED:
-            pass
 
     def stop(self):
         if self.state != self.STARTED:
