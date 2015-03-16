@@ -158,6 +158,7 @@ class Series(Data):
     @Data.output
     def toLightning(self, data, lgn, only_viz=False):
         if only_viz:
+            print "Appending %s to existing line viz." % str(data)
             lgn.append(data)
         else:
             # Do dashboard stuff here
