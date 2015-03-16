@@ -204,6 +204,9 @@ class ThunderStreamingContext(ParamListener):
         print "Starting the Analysis threads."
         self._start_analyses()
 
+        print "Starting the updaters."
+        self._start_updaters()
+
         print "Starting the streaming analyses with run configuration:"
         print self
         self._start_streaming_child()
@@ -255,6 +258,10 @@ class ThunderStreamingContext(ParamListener):
     def _start_analyses(self):
         for analysis in self.analyses.values():
             analysis.start()
+
+    def _start_updaters(self):
+        for updater in self.updaters:
+            updater.start()
 
     def _start_streaming_child(self):
         """
