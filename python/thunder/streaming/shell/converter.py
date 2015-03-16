@@ -182,7 +182,7 @@ class Image(Series):
 
     @staticmethod
     @Data.converter
-    def toImage(analysis, dims=(512, 512, 4), plane=1):
+    def toImage(analysis, dims=(512, 512), plane=1):
         """
         :param analysis: The analysis whose raw output will be parsed and converted into an in-memory image
         :return: An Image object
@@ -194,7 +194,7 @@ class Image(Series):
         if values is not None:
             only_vals = [value[0] for value in values]
             plane_size = self.dims[0] * self.dims[1]
-            return np.asarray(only_vals[self.plane*plane_size:self.plane*plane_size+plane_size]).clip(0, 100).reshape(self.dims)
+            return np.asarray(only_vals[(self.plane*plane_size):(self.plane*plane_size+plane_size)]).clip(0, 100).reshape(self.dims)
 
     @Data.output
     def toLightning(self, data, lgn, only_viz=False):
