@@ -87,6 +87,7 @@ class Analysis(MappedScalaClass, ParamListener):
                     if info[0] != dir_state:
                         self.monitored_dirs[dir] = (dir_state, time.time())
                     else:
+                        print "time_diff: %f" % (time.time() - info[1])
                         if (time.time() - info[1]) > self.FILE_POLL_PERIOD:
                             print "SENDING DIR %s down the output pipeline" % dir
                             # The directory has remained the same for a sufficient period of time
