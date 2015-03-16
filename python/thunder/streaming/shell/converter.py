@@ -88,7 +88,7 @@ class Data(object):
 
     @abstractmethod
     def _convert(self, root, new_data):
-        pass
+        return None
 
     def handle_new_data(self, root, new_data):
         converted = self._convert(root, new_data)
@@ -120,20 +120,25 @@ class Series(Data):
         """
         return Series(analysis)
 
-    def _convert(self, root, new_data):
-        # Load in the dimension JSON file (which we assume exists in the results directory)
-        record_size, dtype = None, None
-        records = OrderedDict()
-
+    def _get_dims(self, root):
         try:
             dims = open(os.path.join(root, Series.DIMS_FILE_NAME), 'r')
             dims_json = json.load(dims)
             record_size = int(dims_json[self.RECORD_SIZE])
             dtype = dims_json[self.DTYPE]
+            return record_size, dtype
         except Exception as e:
             print "Cannot load binary series: %s" % str(e)
+            return None, None
+
+    def _convert(self, root, new_data):
+        # Load in the dimension JSON file (which we assume exists in the results directory)
+        record_size, dtype = None, None
+        records = OrderedDict()
+
+        record_size, dtype = self._get_dims(root)
         if not record_size or not dtype:
-            return
+            return None
 
         for f in new_data:
             # Make sure to exclude the dimensions file
@@ -142,11 +147,9 @@ class Series(Data):
                 fbuf = open(f, 'rb').read()
                 fsize = len(fbuf)
                 ptr = 0
-                print "About to start parsing %s" % f
                 while fsize - ptr != 0:
                     idx = struct.unpack("<i", fbuf[ptr:(ptr + 4)])[0]
                     buf = np.frombuffer(fbuf, dtype=dtype, count=record_size, offset=ptr + 4)
-                    print "idx: %d, buf: %s, ptr: %d" % (idx, str(buf), ptr)
                     records[idx] = buf
                     ptr += 4 + record_size * 8
 
@@ -162,7 +165,7 @@ class Series(Data):
         return self
 
 
-class Image(Data):
+class Image(Series):
 
     @staticmethod
     @Data.converter
@@ -174,20 +177,13 @@ class Image(Data):
         return Image(analysis)
 
     def _convert(self, root, new_data):
-        pass
-
-    @Data.output
-    def toLightning(self, lgn, data):
-        pass
-
-    @Data.output
-    def toFile(self, path, data):
-        pass
-
-
-
-
-
-
-
-
+        keys, values = Series._convert(self, root, new_data)
+        record_size, dtype = self._get_dims(root)
+        if len(values) > 0:
+            # All records must be the same size
+            arr = np.array(xrange(record_size * len(values)), dtype=dtype)
+            for val_idx, record in enumerate(values):
+                for item_idx, item in enumerate(record):
+                    arr[(val_idx * record_size) + item_idx] = item
+            return arr
+        return None
