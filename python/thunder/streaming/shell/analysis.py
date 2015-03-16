@@ -95,8 +95,6 @@ class Analysis(MappedScalaClass, ParamListener):
                             for output in self.outputs:
                                 output.handle_new_data(only_names)
                             del self.monitored_dirs[dir]
-                        else:
-                            self.monitored_dirs[dir] = (dir_state, time.time())
                 time.sleep(self.WAIT_PERIOD)
 
 
