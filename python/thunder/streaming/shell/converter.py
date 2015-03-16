@@ -191,6 +191,7 @@ class Image(Series):
 
     def _convert(self, root, new_data):
         keys, values = Series._convert(self, root, new_data)
+        print "First 100 values in values: %s" % str(values[:100])
         if values is not None:
             only_vals = [value[0] for value in values]
             plane_size = self.dims[0] * self.dims[1]
