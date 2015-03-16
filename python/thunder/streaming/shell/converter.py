@@ -79,7 +79,7 @@ class Data(object):
         :return: The function after it's been added to Analysis' dict
         """
         def add_output(analysis, **kwargs):
-            output = func(analysis, kwargs)
+            output = func(analysis, **kwargs)
             analysis.outputs.append(output)
             return output
         print "Adding %s to Analysis.__dict__" % func.func_name
