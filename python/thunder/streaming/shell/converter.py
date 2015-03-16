@@ -170,7 +170,8 @@ class Series(Data):
 
 class Image(Series):
 
-    def __init__(self, dims)
+    def __init__(self, dims):
+        Series.__init__(self)
         self.dims = dims
 
     @staticmethod
