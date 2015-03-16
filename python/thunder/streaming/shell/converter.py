@@ -5,6 +5,7 @@ import re
 import os
 import json
 from collections import OrderedDict
+import struct
 
 # TODO Fix up comment
 """
@@ -143,7 +144,7 @@ class Series(Data):
                 ptr = 0
                 print "About to start parsing %s" % f
                 while fsize - ptr != 0:
-                    idx = int(fbuf[ptr:(ptr + 4)])
+                    idx = struct.unpack("<i", fbuf[ptr:(ptr + 4)])[0]
                     buf = np.frombuffer(fbuf, dtype=dtype, count=record_size, offset=ptr + 4)
                     print "idx: %d, buf: %s, ptr: %d" % (idx, str(buf), ptr)
                     records[idx] = buf
