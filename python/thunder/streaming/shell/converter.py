@@ -170,7 +170,7 @@ class Series(Data):
 
 class Image(Series):
 
-    def __init__(self, dims):
+    def __init__(self, analysis, dims):
         Series.__init__(self)
         self.dims = dims
 
