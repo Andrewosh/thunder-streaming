@@ -194,7 +194,9 @@ class Image(Series):
         if values is not None:
             only_vals = [value[0] for value in values]
             plane_size = self.dims[0] * self.dims[1]
-            return np.asarray(only_vals[(self.plane*plane_size):(self.plane*plane_size+plane_size)]).clip(0, 100).reshape(self.dims)
+            image_arr = np.asarray(only_vals[(self.plane*plane_size):(self.plane*plane_size+plane_size)]).clip(0, 100).reshape(self.dims)
+            print "Image Array: %s" % str(image_arr)
+            return image_arr
 
     @Data.output
     def toLightning(self, data, lgn, only_viz=False):
