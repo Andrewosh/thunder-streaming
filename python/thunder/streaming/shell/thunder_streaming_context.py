@@ -274,7 +274,7 @@ class ThunderStreamingContext(ParamListener):
             updater.stop()
 
     def _handle_int(self):
-        # self.sig_handler_lock.acquire()
+        print "In _handle_int"
         if self.state == self.STARTED:
             self.stop()
 
