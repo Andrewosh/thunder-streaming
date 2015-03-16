@@ -191,8 +191,8 @@ class Image(Series):
 
     def _convert(self, root, new_data):
         keys, values = Series._convert(self, root, new_data)
-        print "First 100 values in values: %s" % str(values[:100])
         if values is not None:
+            print "First 100 values in values: %s" % str(values[:100])
             only_vals = [value[0] for value in values]
             plane_size = self.dims[0] * self.dims[1]
             image_arr = np.asarray(only_vals[(self.plane*plane_size):(self.plane*plane_size+plane_size)]).clip(0, 100).reshape(self.dims)
