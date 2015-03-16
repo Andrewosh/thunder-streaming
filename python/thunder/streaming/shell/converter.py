@@ -147,6 +147,7 @@ class Series(Data):
                     buf = np.frombuffer(fbuf, dtype=dtype, count=record_size, offset=ptr + 4)
                     print "idx: %d, buf: %s, ptr: %d" % (idx, str(buf), ptr)
                     records[idx] = buf
+                    ptr += 4 + record_size * 8
 
         return records.keys(), records.values()
 
