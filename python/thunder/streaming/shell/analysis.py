@@ -30,6 +30,8 @@ class Analysis(MappedScalaClass, ParamListener):
         DIR_POLL_PERIOD = 1
         # Period with which the FileMonitor will check monitored directories for new files
         FILE_POLL_PERIOD = 1
+        # Time between each poll
+        WAIT_PERIOD = 0.5
 
         def __init__(self, analysis):
             Thread.__init__(self)
@@ -94,6 +96,7 @@ class Analysis(MappedScalaClass, ParamListener):
                             del self.monitored_dirs[dir]
                         else:
                             self.monitored_dirs[dir] = (dir_state, time.time())
+                    time.sleep(self.WAIT_PERIOD)
 
 
     def __init__(self, identifier, full_name, param_dict):
