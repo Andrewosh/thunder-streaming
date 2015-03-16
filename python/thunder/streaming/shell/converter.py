@@ -158,7 +158,6 @@ class Series(Data):
     @Data.output
     def toLightning(self, data, lgn, only_viz=False):
         keys, values = data
-        print "sorted keys: %s" % str(sorted(keys))
         arr_values = np.array(values)
         if not keys or not values:
             return
@@ -192,6 +191,7 @@ class Image(Series):
     def _convert(self, root, new_data):
         keys, values = Series._convert(self, root, new_data)
         if values is not None:
+            print "sorted keys: %s" % str(sorted(keys))
             only_vals = [value[0] for value in values]
             return np.asarray(only_vals[:self.dims[0]*self.dims[1]]).reshape(self.dims)
 
