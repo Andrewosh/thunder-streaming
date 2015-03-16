@@ -138,7 +138,7 @@ class Series(Data):
 
         record_size, dtype = self._get_dims(root)
         if not record_size or not dtype:
-            return None
+            return None, None
 
         for f in new_data:
             # Make sure to exclude the dimensions file
