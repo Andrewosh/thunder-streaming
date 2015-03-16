@@ -157,6 +157,7 @@ class Series(Data):
 
     @Data.output
     def toLightning(self, data, lgn, only_viz=False):
+        print "In Series.toLightning"
         if only_viz:
             print "Appending %s to existing line viz." % str(data)
             lgn.append(data)
