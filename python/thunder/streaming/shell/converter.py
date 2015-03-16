@@ -153,7 +153,7 @@ class Series(Data):
         return records.keys(), records.values()
 
     @Data.output
-    def toLightning(self, lgn, data):
+    def toLightning(self, data, lgn):
         # TODO: just debugging for now
         print "In toLightningServer, data: %s" % str(data)
 
