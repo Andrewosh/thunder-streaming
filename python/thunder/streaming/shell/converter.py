@@ -128,7 +128,7 @@ class Series(Data):
         try:
             dims = open(os.path.join(root, Series.DIMS_FILE_NAME), 'r')
             dims_json = json.load(dims)
-            record_size = dims_json[self.RECORD_SIZE]
+            record_size = int(dims_json[self.RECORD_SIZE])
             dtype = dims_json[self.DTYPE]
         except Exception as e:
             print "Cannot load binary series: %s" % str(e)
