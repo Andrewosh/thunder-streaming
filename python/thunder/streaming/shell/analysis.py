@@ -82,8 +82,8 @@ class Analysis(MappedScalaClass, ParamListener):
                     self.last_dir_poll = cur_time
                 print "*************"
                 for dir, info in self.monitored_dirs.items():
-                    print "dir: %s, info: %s" % (dir, info)
                     dir_state = self._qualified_file_set(dir)
+                    print "dir: %s, info: %s dir_state: %s" % (dir, info, dir_state)
                     if info[0] != dir_state:
                         self.monitored_dirs[dir] = (dir_state, time.time())
                     else:
