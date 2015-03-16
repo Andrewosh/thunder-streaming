@@ -141,6 +141,7 @@ class Series(Data):
                 fbuf = open(f, 'rb').read()
                 fsize = len(fbuf)
                 ptr = 0
+                print "About to start parsing %s" % f
                 while fsize - ptr != 0:
                     idx = int(fbuf[ptr:(ptr + 4)])
                     buf = np.frombuffer(fbuf, dtype=dtype, count=record_size, offset=ptr + 4)
