@@ -86,7 +86,8 @@ class Analysis(MappedScalaClass, ParamListener):
                     print "dir: %s, info: %s dir_state: %s" % (dir, info, dir_state)
                     if info[0] != dir_state:
                         self.monitored_dirs[dir] = (dir_state, time.time())
-                    else:
+                    elif info[0]:
+                        # Only want to get to this point if the directory is not empty
                         print "time_diff: %f" % (time.time() - info[1])
                         if (time.time() - info[1]) > self.FILE_POLL_PERIOD:
                             print "SENDING DIR %s down the output pipeline" % dir

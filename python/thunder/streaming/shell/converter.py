@@ -185,7 +185,8 @@ class Image(Series):
 
     def _convert(self, root, new_data):
         keys, values = Series._convert(self, root, new_data)
-        return np.asarray([value[0] for value in values]).reshape(self.dims)
+        if values is not None:
+            return np.asarray([value[0] for value in values]).reshape(self.dims)
 
     @Data.output
     def toLightning(self, data, lgn, only_viz=False):
