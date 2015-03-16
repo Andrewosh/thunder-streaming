@@ -92,8 +92,6 @@ abstract class Analysis[T <: StreamingData[_, _]](tssc: ThunderStreamingContext,
   extends Updatable {
 
   override def handleUpdate(update: (String, String)): Unit = {
-    // By default, just print the update
-    println(update)
   }
 
   /**
