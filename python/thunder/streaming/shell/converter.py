@@ -157,13 +157,16 @@ class Series(Data):
 
     @Data.output
     def toLightning(self, data, lgn, only_viz=False):
-        print "In Series.toLightning"
+        keys, values = data
+        arr_values = np.array(values)
+        if not keys or not values:
+            return
         if only_viz:
-            print "Appending %s to existing line viz." % str(data)
-            lgn.append(data)
+            print "Appending %s to existing line viz." % str(arr_values)
+            lgn.append(arr_values)
         else:
             # Do dashboard stuff here
-            lgn.line(data)
+            lgn.line(arr_values)
 
     @Data.output
     def toFile(self, path, data):

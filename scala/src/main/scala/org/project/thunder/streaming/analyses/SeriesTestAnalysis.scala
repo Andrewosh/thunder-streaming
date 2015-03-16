@@ -5,6 +5,7 @@ import org.project.thunder.streaming.rdds.StreamingSeries
 
 import org.project.thunder.streaming.regression.StatefulLinearRegression
 import org.project.thunder.streaming.util.ThunderStreamingContext
+import org.apache.spark.SparkContext._
 
 import spray.json._
 import DefaultJsonProtocol._
@@ -69,29 +70,39 @@ class SeriesFiltering1Analysis(tssc: ThunderStreamingContext, params: AnalysisPa
 class SeriesFiltering2Analysis(tssc: ThunderStreamingContext, params: AnalysisParams)
     extends SeriesTestAnalysis(tssc, params) {
 
+  var context = tssc.context
+
   override def handleUpdate(update: (String, String)): Unit = {
     UpdatableParameters.setUpdatableParam("keySet", update._2)
     println("SeriesFilteringAnalysis2 setting %s to %s".format("keySet", update._2))
   }
 
   def analyze(data: StreamingSeries): StreamingSeries = {
-    val filteredData = data.filterOnKeys{ k => {
+    val filteredData = data.dstream.transform { rdd =>
       val keySet = UpdatableParameters.getUpdatableParam("keySet")
-      println("keySet: %s".format(keySet.toString))
-      keySet match {
-          case Some(s) => {
-            val keys: Set[Int] = JsonParser(s).convertTo[List[Int]].toSet[Int]
-            if (k == 0) {
-              println("k = %s and keys: %s".format(k.toString, keys.toString))
-            }
-            (keys.isEmpty) || keys.contains(k)
-          }
-          case _ => false
+      val keys = keySet match {
+        case Some(s) => {
+          JsonParser(s).convertTo[List[List[Int]]].map(_.toSet[Int])
         }
+        case _ => List()
       }
+
+      val withIndices = keys.zipWithIndex
+      val setSizes = withIndices.foldLeft(Map[Int, Int]()) {
+        (curMap, s) => curMap + (s._2 -> s._1.size)
+      }
+
+      // Reindex the (k,v) pairs with their set inclusion values as K
+      val mappedKeys = rdd.flatMap { case (k, v) =>
+        val setMatches = withIndices.map { case (set, i) => if (set.contains(k)) (i, v) else (-1, v)}
+        setMatches.filter { case (k, v) => k != -1}
+      }
+
+      // For each set, compute the mean time series (pointwise addition divided by set size)
+      val sumSeries = mappedKeys.reduceByKey((arr1, arr2) => arr1.zip(arr2).map { case (v1, v2) => v1 + v2})
+      sumSeries.map { case (idx, sumArr) => (idx, sumArr.map(x => x / setSizes(idx)))}
     }
-    filteredData.print()
-    filteredData
+    new StreamingSeries(filteredData)
   }
 }
 
