@@ -136,7 +136,7 @@ class Series(Data):
 
         for f in new_data:
             # Make sure to exclude the dimensions file
-            if not f.search(self.DIMS_FILE_NAME):
+            if not self.DIMS_PATTERN.search(f):
                 # Load each line according to record_size and dtype
                 fbuf = open(f, 'rb').read()
                 fsize = len(fbuf)
