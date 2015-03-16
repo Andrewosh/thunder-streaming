@@ -80,17 +80,13 @@ class Analysis(MappedScalaClass, ParamListener):
                             self._start_monitoring(diff)
                         self._last_dir_state = cur_dir_state
                     self.last_dir_poll = cur_time
-                print "*************"
                 for dir, info in self.monitored_dirs.items():
                     dir_state = self._qualified_file_set(dir)
-                    print "dir: %s, info: %s dir_state: %s" % (dir, info, dir_state)
                     if info[0] != dir_state:
                         self.monitored_dirs[dir] = (dir_state, time.time())
                     elif info[0]:
                         # Only want to get to this point if the directory is not empty
-                        print "time_diff: %f" % (time.time() - info[1])
                         if (time.time() - info[1]) > self.FILE_POLL_PERIOD:
-                            print "SENDING DIR %s down the output pipeline" % dir
                             # The directory has remained the same for a sufficient period of time
                             only_names = map(lambda x: x[0], dir_state)
                             for output in self.outputs:

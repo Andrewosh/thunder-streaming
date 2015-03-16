@@ -191,7 +191,6 @@ class Image(Series):
     @Data.output
     def toLightning(self, data, lgn, only_viz=False):
         if only_viz:
-            print "Sending %s to Lighting" % str(data)
             lgn.update(data)
         else:
             # Do dashboard stuff here
