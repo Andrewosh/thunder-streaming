@@ -77,15 +77,28 @@ class SeriesFiltering2Analysis(tssc: ThunderStreamingContext, params: AnalysisPa
     println("SeriesFilteringAnalysis2 setting %s to %s".format("keySet", update._2))
   }
 
+
+
   def analyze(data: StreamingSeries): StreamingSeries = {
     val filteredData = data.dstream.transform { rdd =>
-      val keySet = UpdatableParameters.getUpdatableParam("keySet")
-      val keys = keySet match {
-        case Some(s) => {
-          JsonParser(s).convertTo[List[List[Int]]].map(_.toSet[Int])
+
+      def getKeysFromJson(keySet: Option[String], dims: (Int, Int, Int) = (512, 512, 0)): List[Set[Int]]= {
+        val parsedKeys = keySet match {
+            case Some(s) => {
+              JsonParser(s).convertTo[List[List[List[Double]]]]
+            }
+            case _ => List()
         }
-        case _ => List()
+        if (dims._3 == 0) {
+          parsedKeys.map(_.map(l => ((dims._1 - 1) * l(0) + l(1)).toInt).toSet[Int])
+        } else {
+          List[Set[Int]]()
+        }
       }
+
+      val keySet = UpdatableParameters.getUpdatableParam("keySet")
+
+      val keys = getKeysFromJson(keySet)
 
       val withIndices = keys.zipWithIndex
       val setSizes = withIndices.foldLeft(Map[Int, Int]()) {
