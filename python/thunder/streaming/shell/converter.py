@@ -159,6 +159,7 @@ class Series(Data):
     def toLightning(self, data, lgn):
         # TODO: just debugging for now
         print "In toLightningServer, data: %s" % str(data)
+        lgn.line(data)
 
     @Data.output
     def toFile(self, path, data):
@@ -187,3 +188,9 @@ class Image(Series):
                     arr[(val_idx * record_size) + item_idx] = item
             return arr
         return None
+
+    @Data.output
+    def toLightning(self, data, lgn, dims):
+        lgn.image(data)
+
+
