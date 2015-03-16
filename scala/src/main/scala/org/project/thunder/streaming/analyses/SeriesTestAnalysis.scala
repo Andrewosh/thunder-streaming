@@ -86,7 +86,7 @@ class SeriesFiltering2Analysis(tssc: ThunderStreamingContext, params: AnalysisPa
             }
             (keys.isEmpty) || keys.contains(k)
           }
-          case _ => true
+          case _ => false
         }
       }
     }
