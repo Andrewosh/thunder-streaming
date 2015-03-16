@@ -142,8 +142,9 @@ class Series(Data):
                 fsize = len(fbuf)
                 ptr = 0
                 while fsize - ptr != 0:
-                    idx = int(fbuf[ptr:ptr + 4])
+                    idx = int(fbuf[ptr:(ptr + 4)])
                     buf = np.frombuffer(fbuf, dtype=dtype, count=record_size, offset=ptr + 4)
+                    print "idx: %d, buf: %s, ptr: %d" % (idx, str(buf), ptr)
                     records[idx] = buf
 
         return records.keys(), records.values()
