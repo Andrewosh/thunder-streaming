@@ -192,8 +192,7 @@ class Image(Series):
         keys, values = Series._convert(self, root, new_data)
         if values is not None:
             only_vals = [value[0] for value in values]
-            print "len(only_vals): %d" % len(only_vals)
-            return np.asarray(only_vals).reshape(self.dims)
+            return np.asarray(only_vals[:int(len(only_vals)/4.0)]).reshape(self.dims)
 
     @Data.output
     def toLightning(self, data, lgn, only_viz=False):
