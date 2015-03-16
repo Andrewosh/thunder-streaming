@@ -78,8 +78,8 @@ class Data(object):
         :param func: A function with a single parameter type, Analysis, that must return an instance of Data
         :return: The function after it's been added to Analysis' dict
         """
-        def add_output(analysis):
-            output = func(analysis)
+        def add_output(analysis, **kwargs):
+            output = func(analysis, kwargs)
             analysis.outputs.append(output)
             return output
         print "Adding %s to Analysis.__dict__" % func.func_name
