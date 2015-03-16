@@ -138,7 +138,7 @@ class Series(Data):
 
         record_size, dtype = self._get_dims(root)
         if not record_size or not dtype:
-            return None, None
+            return None
 
         for f in new_data:
             # Make sure to exclude the dimensions file
@@ -153,14 +153,14 @@ class Series(Data):
                     records[idx] = buf
                     ptr += 4 + record_size * 8
 
-        return records.keys(), records.values()
+        return records
 
     @Data.output
     def toLightning(self, data, lgn, only_viz=False):
-        keys, values = data
-        arr_values = np.array(values)
-        if not keys or not values:
+        if not data:
             return
+        keys, values = (data.keys(), data.values())
+        arr_values = np.array(values)
         if only_viz:
             print "Appending %s to existing line viz." % str(arr_values)
             lgn.append(arr_values)
@@ -190,10 +190,12 @@ class Image(Series):
         return Image(analysis, dims, plane)
 
     def _convert(self, root, new_data):
-        keys, values = Series._convert(self, root, new_data)
-        if values is not None:
-            print "First 100 values in values: %s" % str(values[:100])
-            only_vals = [value[0] for value in values]
+        records = Series._convert(self, root, new_data)
+        if records is not None:
+            # Sort the keys/values
+            sorted_vals = map(lambda x: records[x], sorted(records))
+            only_vals = [value[0] for value in sorted_vals]
+            print "First 100 values in values: %s" % str(only_vals[:100])
             plane_size = self.dims[0] * self.dims[1]
             image_arr = np.asarray(only_vals[(self.plane*plane_size):(self.plane*plane_size+plane_size)]).clip(0, 100).reshape(self.dims)
             print "Image Array: %s" % str(image_arr)

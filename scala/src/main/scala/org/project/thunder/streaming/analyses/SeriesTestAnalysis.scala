@@ -34,7 +34,8 @@ object SeriesTestAnalysis {
 class SeriesMeanAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
     extends SeriesTestAnalysis(tssc, params) {
   def analyze(data: StreamingSeries): StreamingSeries = {
-    data.seriesMean()
+    val mean = data.seriesMean()
+    mean
   }
 }
 
