@@ -158,6 +158,7 @@ class Series(Data):
     @Data.output
     def toLightning(self, data, lgn, only_viz=False):
         keys, values = data
+        print "sorted keys: %s" % str(sorted(keys))
         arr_values = np.array(values)
         if not keys or not values:
             return
