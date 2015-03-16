@@ -53,6 +53,8 @@ class Analysis(MappedScalaClass, ParamListener):
                 self.monitored_dirs[dir] = (diff, time.time())
 
         def _qualified_dir_set(self, root):
+            if not root:
+                return None
             return set([os.path.join(root, f) for f in os.listdir(root)])
 
         def _qualified_file_set(self, root):
@@ -60,6 +62,8 @@ class Analysis(MappedScalaClass, ParamListener):
                 path = os.path.join(root, f)
                 size = os.path.getsize(path)
                 return (path, size)
+            if not root:
+                return None
             return set([path_and_size(f) for f in os.listdir(root)])
 
         def run(self):
