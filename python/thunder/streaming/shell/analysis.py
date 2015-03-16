@@ -96,7 +96,7 @@ class Analysis(MappedScalaClass, ParamListener):
                             del self.monitored_dirs[dir]
                         else:
                             self.monitored_dirs[dir] = (dir_state, time.time())
-                    time.sleep(self.WAIT_PERIOD)
+                time.sleep(self.WAIT_PERIOD)
 
 
     def __init__(self, identifier, full_name, param_dict):
