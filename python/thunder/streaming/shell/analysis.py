@@ -93,7 +93,7 @@ class Analysis(MappedScalaClass, ParamListener):
                             # The directory has remained the same for a sufficient period of time
                             only_names = map(lambda x: x[0], dir_state)
                             for output in self.outputs:
-                                output.handle_new_data(only_names)
+                                output.handle_new_data(dir, only_names)
                             del self.monitored_dirs[dir]
                 time.sleep(self.WAIT_PERIOD)
 

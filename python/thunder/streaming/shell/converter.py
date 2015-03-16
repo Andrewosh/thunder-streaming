@@ -89,8 +89,8 @@ class Data(object):
     def _convert(self, root, new_data):
         pass
 
-    def handle_new_data(self, new_data):
-        converted = self._convert(new_data)
+    def handle_new_data(self, root, new_data):
+        converted = self._convert(root, new_data)
         for func in self.output_funcs.values():
             func(converted)
 
