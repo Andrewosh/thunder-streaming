@@ -156,10 +156,12 @@ class Series(Data):
         return records.keys(), records.values()
 
     @Data.output
-    def toLightning(self, data, lgn):
-        # TODO: just debugging for now
-        print "In toLightningServer, data: %s" % str(data)
-        lgn.line(data)
+    def toLightning(self, data, lgn, only_viz=False):
+        if only_viz:
+            lgn.append(data)
+        else:
+            # Do dashboard stuff here
+            lgn.line(data)
 
     @Data.output
     def toFile(self, path, data):
@@ -168,29 +170,28 @@ class Series(Data):
 
 class Image(Series):
 
+    def __init__(self, dims)
+        self.dims = dims
+
     @staticmethod
     @Data.converter
-    def toImage(analysis):
+    def toImage(analysis, dims=(512, 512, 4)):
         """
         :param analysis: The analysis whose raw output will be parsed and converted into an in-memory image
         :return: An Image object
         """
-        return Image(analysis)
+        return Image(analysis, dims)
 
     def _convert(self, root, new_data):
         keys, values = Series._convert(self, root, new_data)
-        record_size, dtype = self._get_dims(root)
-        if len(values) > 0:
-            # All records must be the same size
-            arr = np.array(xrange(record_size * len(values)), dtype=dtype)
-            for val_idx, record in enumerate(values):
-                for item_idx, item in enumerate(record):
-                    arr[(val_idx * record_size) + item_idx] = item
-            return arr
-        return None
+        return np.asarray([value[0] for value in values]).reshape(self.dims)
 
     @Data.output
-    def toLightning(self, data, lgn, dims):
-        lgn.image(data)
+    def toLightning(self, data, lgn, only_viz=False):
+        if only_viz:
+            lgn.update(data)
+        else:
+            # Do dashboard stuff here
+            lgn.image(data)
 
 
