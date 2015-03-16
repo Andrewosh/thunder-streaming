@@ -175,25 +175,26 @@ class Series(Data):
 
 class Image(Series):
 
-    def __init__(self, analysis, dims):
+    def __init__(self, analysis, dims, plane):
         Series.__init__(self, analysis)
         self.dims = dims
+        self.plane = plane
 
     @staticmethod
     @Data.converter
-    def toImage(analysis, dims=(512, 512, 4)):
+    def toImage(analysis, dims=(512, 512, 4), plane=1):
         """
         :param analysis: The analysis whose raw output will be parsed and converted into an in-memory image
         :return: An Image object
         """
-        return Image(analysis, dims)
+        return Image(analysis, dims, plane)
 
     def _convert(self, root, new_data):
         keys, values = Series._convert(self, root, new_data)
         if values is not None:
-            print "sorted keys: %s" % str(sorted(keys))
             only_vals = [value[0] for value in values]
-            return np.asarray(only_vals[:self.dims[0]*self.dims[1]]).reshape(self.dims)
+            plane_size = self.dims[0] * self.dims[1]
+            return np.asarray(only_vals[self.plane*plane_size:self.plane*plane_size+plane_size).clip(0, 100).reshape(self.dims)
 
     @Data.output
     def toLightning(self, data, lgn, only_viz=False):
