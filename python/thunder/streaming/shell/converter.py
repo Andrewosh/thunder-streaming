@@ -157,7 +157,7 @@ class Series(Data):
 
     @Data.output
     def toLightning(self, data, lgn, only_viz=False):
-        if not data:
+        if data is None or data.size == 0:
             return
         keys, values = (data.keys(), data.values())
         arr_values = np.array(values)
@@ -203,7 +203,7 @@ class Image(Series):
 
     @Data.output
     def toLightning(self, data, lgn, only_viz=False):
-        if not data:
+        if data is None or data.size == 0:
             return
         if only_viz:
             lgn.update(data)
