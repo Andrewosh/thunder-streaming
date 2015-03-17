@@ -159,8 +159,9 @@ class Series(Data):
     def toLightning(self, data, lgn, only_viz=False):
         if data is None or len(data) == 0:
             return
-        keys, values = (data.keys(), data.values())
-        arr_values = np.array(values)
+        # Make sure the values are sorted
+        sorted_vals = map(lambda x: data[x], sorted(data))
+        arr_values = np.array(sorted_vals)
         if only_viz:
             print "Appending %s to existing line viz." % str(arr_values)
             lgn.append(arr_values)

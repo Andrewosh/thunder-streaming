@@ -44,7 +44,6 @@ class SeriesFiltering1Analysis(tssc: ThunderStreamingContext, params: AnalysisPa
 
   override def handleUpdate(update: (String, String)): Unit = {
     UpdatableParameters.setUpdatableParam("keySet", update._2)
-    println("SeriesFilteringAnalysis1 setting %s to %s".format("keySet", update._2))
   }
 
   def analyze(data: StreamingSeries): StreamingSeries = {
@@ -75,7 +74,6 @@ class SeriesFiltering2Analysis(tssc: ThunderStreamingContext, params: AnalysisPa
 
   override def handleUpdate(update: (String, String)): Unit = {
     UpdatableParameters.setUpdatableParam("keySet", update._2)
-    println("SeriesFilteringAnalysis2 setting %s to %s".format("keySet", update._2))
   }
 
 
