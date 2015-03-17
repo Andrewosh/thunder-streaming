@@ -198,7 +198,7 @@ class Image(Series):
             only_vals = [value[0] for value in sorted_vals]
             print "First 100 values in values: %s" % str(only_vals[:100])
             plane_size = self.dims[0] * self.dims[1]
-            image_arr = np.asarray(only_vals[(self.plane*plane_size):(self.plane*plane_size+plane_size)]).clip(0, 100).reshape(self.dims)
+            image_arr = np.asarray(only_vals[(self.plane*plane_size):(self.plane*plane_size+plane_size)]).clip(0, 200).reshape(self.dims)
             print "Image Array: %s" % str(image_arr)
             return image_arr
 

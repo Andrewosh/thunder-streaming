@@ -39,6 +39,14 @@ class SeriesMeanAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
   }
 }
 
+class SeriesBatchMeanAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
+    extends SeriesTestAnalysis(tssc, params) {
+  def analyze(data: StreamingSeries): StreamingSeries = {
+    val batchMean = data.dstream.map{ case (k, v) => (k, Array(v.reduce(_ + _) / v.size)) }
+    new StreamingSeries(batchMean)
+  }
+}
+
 class SeriesFiltering1Analysis(tssc: ThunderStreamingContext, params: AnalysisParams)
     extends SeriesTestAnalysis(tssc, params) {
 
