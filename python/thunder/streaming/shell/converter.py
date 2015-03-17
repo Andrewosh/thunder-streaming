@@ -203,6 +203,8 @@ class Image(Series):
 
     @Data.output
     def toLightning(self, data, lgn, only_viz=False):
+        if not data:
+            return
         if only_viz:
             lgn.update(data)
         else:
