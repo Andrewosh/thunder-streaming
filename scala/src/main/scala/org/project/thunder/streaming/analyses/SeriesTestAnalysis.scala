@@ -87,6 +87,7 @@ class SeriesFiltering2Analysis(tssc: ThunderStreamingContext, params: AnalysisPa
 
 
   def analyze(data: StreamingSeries): StreamingSeries = {
+    val partitionSize = params.getSingleParam("partition_size").toInt
     val filteredData = data.dstream.transform { rdd =>
 
       def getKeysFromJson(keySet: Option[String], dims: (Int, Int, Int) = (512, 512, 0)): List[Set[Int]]= {
@@ -120,7 +121,10 @@ class SeriesFiltering2Analysis(tssc: ThunderStreamingContext, params: AnalysisPa
 
       // For each set, compute the mean time series (pointwise addition divided by set size)
       val sumSeries = mappedKeys.reduceByKey((arr1, arr2) => arr1.zip(arr2).map { case (v1, v2) => v1 + v2})
-      sumSeries.map { case (idx, sumArr) => (idx, sumArr.map(x => x / setSizes(idx)))}
+      val meanedSeries = sumSeries.map { case (idx, sumArr) => (idx, sumArr.map(x => x / setSizes(idx)))}
+
+      // Do some temporal averaging on the (spatial) mean time series
+      meanedSeries.map{ case (idx, meanArray) => (idx, meanArray.sliding(partitionSize).map(x => x.reduce(_+_) / x.size).toArray[Double]) }
     }
     new StreamingSeries(filteredData)
   }
