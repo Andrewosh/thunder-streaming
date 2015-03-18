@@ -98,7 +98,7 @@ class SeriesFiltering2Analysis(tssc: ThunderStreamingContext, params: AnalysisPa
             case _ => List()
         }
         if (dims._3 == 0) {
-          parsedKeys.map(_.map(l => ((dims._1 - 1) * l(0) + l(1)).toInt).toSet[Int])
+          parsedKeys.map(_.map(l => ((dims._1) * l(0) + l(1)).toInt).toSet[Int])
         } else {
           List[Set[Int]]()
         }

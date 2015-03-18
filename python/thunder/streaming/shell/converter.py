@@ -207,6 +207,7 @@ class Image(Series):
         if data is None or len(data) == 0:
             return
         if only_viz:
+            print "SENDING IMAGE TO LIGHTNING"
             lgn.update(data)
         else:
             # Do dashboard stuff here
