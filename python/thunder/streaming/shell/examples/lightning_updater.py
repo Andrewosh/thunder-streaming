@@ -10,4 +10,5 @@ class LightningUpdater(Updater):
 
     def fetch_update(self):
         regions = self.viz.get_coords(return_type='points')
+        print "regions: %s, len: %d" % (str(regions), len(regions))
         return self.tag, [r.tolist() for r in regions]
