@@ -176,19 +176,19 @@ class Series(Data):
 
 class Image(Series):
 
-    def __init__(self, analysis, dims, plane):
+    def __init__(self, analysis, dims, clip):
         Series.__init__(self, analysis)
         self.dims = dims
-        self.plane = plane
+        self.clip = clip
 
     @staticmethod
     @Data.converter
-    def toImage(analysis, dims=(512, 512), plane=0):
+    def toImage(analysis, dims=(512, 512, 4), clip=400):
         """
         :param analysis: The analysis whose raw output will be parsed and converted into an in-memory image
         :return: An Image object
         """
-        return Image(analysis, dims, plane)
+        return Image(analysis, dims, clip)
 
     def _convert(self, root, new_data):
         records = Series._convert(self, root, new_data)
@@ -196,21 +196,23 @@ class Image(Series):
             # Sort the keys/values
             sorted_vals = map(lambda x: records[x], sorted(records))
             only_vals = [value[0] for value in sorted_vals]
-            print "First 100 values in values: %s" % str(only_vals[:100])
-            plane_size = self.dims[0] * self.dims[1]
-            image_arr = np.asarray(only_vals[(self.plane*plane_size):(self.plane*plane_size+plane_size)]).clip(0, 400).reshape(self.dims)
-            print "Image Array: %s" % str(image_arr)
+            image_arr = np.asarray(only_vals).clip(0, self.clip).reshape(self.dims)
             return image_arr
 
     @Data.output
-    def toLightning(self, data, lgn, only_viz=False):
+    def toLightning(self, data, lgn, plane=0, only_viz=False):
         if data is None or len(data) == 0:
             return
+        plane_size = self.dims[0] * self.dims[1]
+        plane_data = data[plane * plane_size:(plane + 1) * plane_size]
         if only_viz:
-            print "SENDING IMAGE TO LIGHTNING"
-            lgn.update(data)
+            lgn.update(plane_data)
         else:
             # Do dashboard stuff here
-            lgn.image(data)
+            lgn.image(plane_data)
+
+    @Data.output
+    def toFile(self, path, data):
+        return self
 
 

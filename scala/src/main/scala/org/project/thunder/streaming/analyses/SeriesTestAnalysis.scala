@@ -84,21 +84,20 @@ class SeriesFiltering2Analysis(tssc: ThunderStreamingContext, params: AnalysisPa
     UpdatableParameters.setUpdatableParam("keySet", update._2)
   }
 
-
-
   def analyze(data: StreamingSeries): StreamingSeries = {
     val partitionSize = params.getSingleParam("partition_size").toInt
+    val dims = params.getSingleParam("dims").parseJson.convertTo[List[Int]]
     val filteredData = data.dstream.transform { rdd =>
 
-      def getKeysFromJson(keySet: Option[String], dims: (Int, Int, Int) = (512, 512, 0)): List[Set[Int]]= {
+      def getKeysFromJson(keySet: Option[String], dims: List[Int]): List[Set[Int]]= {
         val parsedKeys = keySet match {
             case Some(s) => {
               JsonParser(s).convertTo[List[List[List[Double]]]]
             }
             case _ => List()
         }
-        if (dims._3 == 0) {
-          parsedKeys.map(_.map(l => ((dims._1) * l(0) + l(1)).toInt).toSet[Int])
+        if (dims(2) == 0) {
+          parsedKeys.map(_.map(l => (dims(0) * l(0) + l(1)).toInt).toSet[Int])
         } else {
           List[Set[Int]]()
         }
@@ -106,7 +105,7 @@ class SeriesFiltering2Analysis(tssc: ThunderStreamingContext, params: AnalysisPa
 
       val keySet = UpdatableParameters.getUpdatableParam("keySet")
 
-      val keys = getKeysFromJson(keySet)
+      val keys = getKeysFromJson(keySet, dims)
 
       val withIndices = keys.zipWithIndex
       val setSizes = withIndices.foldLeft(Map[Int, Int]()) {
