@@ -89,7 +89,9 @@ object UpdatableParameters extends Serializable {
 
 
 abstract class Analysis[T <: StreamingData[_, _]](tssc: ThunderStreamingContext, params: AnalysisParams)
-  extends Updatable {
+  extends Updatable with Serializable {
+
+  @transient var context = tssc.context
 
   override def handleUpdate(update: (String, String)): Unit = {
   }

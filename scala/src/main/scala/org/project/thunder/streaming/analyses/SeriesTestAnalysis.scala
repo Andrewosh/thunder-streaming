@@ -78,30 +78,27 @@ class SeriesFiltering1Analysis(tssc: ThunderStreamingContext, params: AnalysisPa
 class SeriesFiltering2Analysis(tssc: ThunderStreamingContext, params: AnalysisParams)
     extends SeriesTestAnalysis(tssc, params) {
 
-  var context = tssc.context
+  val partitionSize = params.getSingleParam("partition_size").toInt
+  val dims = params.getSingleParam("dims").parseJson.convertTo[List[Int]]
+
+  def getKeysFromJson(keySet: Option[String], dims: List[Int]): List[Set[Int]]= {
+    val parsedKeys = keySet match {
+        case Some(s) => {
+          JsonParser(s).convertTo[List[List[List[Double]]]]
+        }
+        case _ => List()
+    }
+    parsedKeys.map(_.map(key => {
+        key.zipWithIndex.foldLeft(0){ case (sum, (dim, idx)) => (sum + (dims(idx) * dim)).toInt }
+    }).toSet[Int])
+  }
 
   override def handleUpdate(update: (String, String)): Unit = {
     UpdatableParameters.setUpdatableParam("keySet", update._2)
   }
 
   def analyze(data: StreamingSeries): StreamingSeries = {
-    val partitionSize = params.getSingleParam("partition_size").toInt
-    val dims = params.getSingleParam("dims").parseJson.convertTo[List[Int]]
     val filteredData = data.dstream.transform { rdd =>
-
-      def getKeysFromJson(keySet: Option[String], dims: List[Int]): List[Set[Int]]= {
-        val parsedKeys = keySet match {
-            case Some(s) => {
-              JsonParser(s).convertTo[List[List[List[Double]]]]
-            }
-            case _ => List()
-        }
-        if (dims(2) == 0) {
-          parsedKeys.map(_.map(l => (dims(0) * l(0) + l(1)).toInt).toSet[Int])
-        } else {
-          List[Set[Int]]()
-        }
-      }
 
       val keySet = UpdatableParameters.getUpdatableParam("keySet")
 
@@ -120,10 +117,10 @@ class SeriesFiltering2Analysis(tssc: ThunderStreamingContext, params: AnalysisPa
 
       // For each set, compute the mean time series (pointwise addition divided by set size)
       val sumSeries = mappedKeys.reduceByKey((arr1, arr2) => arr1.zip(arr2).map { case (v1, v2) => v1 + v2})
-      val meanedSeries = sumSeries.map { case (idx, sumArr) => (idx, sumArr.map(x => x / setSizes(idx)))}
+      val meanSeries = sumSeries.map { case (idx, sumArr) => (idx, sumArr.map(x => x / setSizes(idx)))}
 
       // Do some temporal averaging on the (spatial) mean time series
-      meanedSeries.map{ case (idx, meanArray) => (idx, meanArray.sliding(partitionSize).map(x => x.reduce(_+_) / x.size).toArray[Double]) }
+      meanSeries.map{ case (idx, meanArray) => (idx, meanArray.sliding(partitionSize).map(x => x.reduce(_+_) / x.size).toArray[Double]) }
     }
     new StreamingSeries(filteredData)
   }

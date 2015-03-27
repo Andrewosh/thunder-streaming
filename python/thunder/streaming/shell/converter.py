@@ -1,11 +1,13 @@
 from thunder.streaming.shell.analysis import Analysis
+
 from abc import abstractmethod
+from collections import OrderedDict
 import numpy as np
 import re
 import os
 import json
-from collections import OrderedDict
 import struct
+import time
 
 # TODO Fix up comment
 """
@@ -111,6 +113,10 @@ class Series(Data):
     DTYPE = "dtype"
     DIMS_PATTERN = re.compile(DIMS_FILE_NAME)
 
+    def __init__(self, analysis, dtype="float16"):
+        Data.__init__(self, analysis)
+        self.dtype = dtype
+
     @staticmethod
     @Data.converter
     def toSeries(analysis):
@@ -131,28 +137,42 @@ class Series(Data):
             print "Cannot load binary series: %s" % str(e)
             return None, None
 
+    def _loadBinaryFromPath(self, p, record_size, dtype):
+        # Load each line according to record_size and dtype
+        fbuf = open(f, 'rb').read()
+        fsize = len(fbuf)
+        ptr = 0
+        while fsize - ptr != 0:
+            idx = struct.unpack("<i", fbuf[ptr:(ptr + 4)])[0]
+            buf = np.frombuffer(fbuf, dtype=dtype, count=record_size, offset=ptr + 4)
+            ptr += 4 + record_size * 8
+            yield idx, buf
+
+    def _saveBinaryToPath(self, p, data):
+        with open(p, 'wb') as f:
+            vals = None
+            if isinstance(data, dict):
+                vals = map(lambda x: data[x], sorted(data))
+            elif isinstance(data, list):
+                vals = sorted(data)
+            arr = np.array(vals)
+            np.save(f, arr)
+
     def _convert(self, root, new_data):
-        # Load in the dimension JSON file (which we assume exists in the results directory)
-        record_size, dtype = None, None
         records = OrderedDict()
 
+        # Load in the dimension JSON file (which we assume exists in the results directory)
         record_size, dtype = self._get_dims(root)
         if not record_size or not dtype:
             return None
+        self.dtype = dtype
 
         for f in new_data:
             # Make sure to exclude the dimensions file
             if not self.DIMS_PATTERN.search(f):
                 # Load each line according to record_size and dtype
-                fbuf = open(f, 'rb').read()
-                fsize = len(fbuf)
-                ptr = 0
-                while fsize - ptr != 0:
-                    idx = struct.unpack("<i", fbuf[ptr:(ptr + 4)])[0]
-                    buf = np.frombuffer(fbuf, dtype=dtype, count=record_size, offset=ptr + 4)
+                for idx, buf in self._loadBinaryFromPath(f, record_size, dtype):
                     records[idx] = buf
-                    ptr += 4 + record_size * 8
-
         return records
 
     @Data.output
@@ -170,11 +190,21 @@ class Series(Data):
             lgn.line(arr_values)
 
     @Data.output
-    def toFile(self, path, data):
-        return self
+    def toFile(self, path, data, prefix=None, fileType='bin'):
+        """
+        If prefix is specified, a different file will be written out at every batch. If not, the same image file will be
+        overwritten.
+        """
+        # TODO implement saving with keys as well
+        fullPath = path if not prefix else path + '-' + time.time()
+        fullPath = fullPath + '.' + fileType
+        self._saveBinaryToPath(fullPath, data)
 
 
 class Image(Series):
+    """
+    Represents a 2 or 3 dimensional image
+    """
 
     def __init__(self, analysis, dims, clip):
         Series.__init__(self, analysis)
@@ -199,12 +229,18 @@ class Image(Series):
             image_arr = np.asarray(only_vals).clip(0, self.clip).reshape(self.dims)
             return image_arr
 
+    def _getPlaneData(self, data, plane):
+        plane_size = self.dims[0] * self.dims[1]
+        return data[plane * plane_size:(plane + 1) * plane_size]
+
     @Data.output
     def toLightning(self, data, lgn, plane=0, only_viz=False):
         if data is None or len(data) == 0:
             return
-        plane_size = self.dims[0] * self.dims[1]
-        plane_data = data[plane * plane_size:(plane + 1) * plane_size]
+        if len(self.dims) > 3 or len(self.dims) < 1:
+            print "Invalid images dimensions (must be < 3 and >= 1)"
+            return
+        plane_data = self._getPlaneData(data, plane)
         if only_viz:
             lgn.update(plane_data)
         else:
@@ -212,7 +248,6 @@ class Image(Series):
             lgn.image(plane_data)
 
     @Data.output
-    def toFile(self, path, data):
-        return self
-
+    def toFile(self, path, data, prefix=None, fileType='img'):
+        Series._saveBinaryToPath(self, prefix, fileType)
 
