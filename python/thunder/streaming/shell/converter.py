@@ -214,7 +214,7 @@ class Image(Series):
 
     def _convert(self, root, new_data):
         series = Series._convert(self, root, new_data)
-        if series is not None:
+        if series is not None and len(series) != 0:
             # Sort the keys/values
             image_arr = series.clip(0, self.clip).reshape(self.dims)
             return image_arr
