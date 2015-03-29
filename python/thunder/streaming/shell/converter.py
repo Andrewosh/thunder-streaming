@@ -139,10 +139,12 @@ class Series(Data):
 
     def _loadBinaryFromPath(self, p, dtype):
         # Load each line according to record_size and dtype
+        print "Before file load/buffering" 
         fbuf = open(p, 'rb').read()
         return np.frombuffer(fbuf, dtype=dtype)
 
     def _saveBinaryToPath(self, p, data):
+        print "In _saveBinaryToPath, saving to: %s" % p
         with open(p, 'wb') as f:
             np.save(f, data)
 
@@ -181,6 +183,7 @@ class Series(Data):
         overwritten.
         """
         # TODO implement saving with keys as well
+        print "In Series.toFile..."
         if path:
             fullPath = path if not prefix else path + '-' + str(time.time())
             fullPath = fullPath + '.' + fileType
