@@ -139,7 +139,7 @@ class Series(Data):
 
     def _loadBinaryFromPath(self, p, record_size, dtype):
         # Load each line according to record_size and dtype
-        fbuf = open(f, 'rb').read()
+        fbuf = open(p, 'rb').read()
         fsize = len(fbuf)
         ptr = 0
         while fsize - ptr != 0:

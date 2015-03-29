@@ -77,8 +77,8 @@ class ThunderStreamingContext(ParamListener):
             'CONFIG_FILE_PATH': None,
             'CHECKPOINT': None,
             # TODO FOR TESTING ONLY
-            'PARALLELISM': '100',
-            'EXECUTOR_MEMORY': '100G',
+            'PARALLELISM': None,
+            'EXECUTOR_MEMORY': None,
             'CHECKPOINT_INTERVAL': '10000',
             'HADOOP_BLOCK_SIZE': '1'
         }
