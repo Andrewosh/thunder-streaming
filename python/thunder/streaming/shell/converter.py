@@ -165,7 +165,7 @@ class Series(Data):
         self.dtype = dtype
 
         merged_series = np.array([], dtype=dtype)
-        without_dims = filter(new_data, lambda x: not self.DIMS_PATTERN.search(x))
+        without_dims = filter(lambda x: not self.DIMS_PATTERN.search(x), new_data)
         sorted_files = sorted(without_dims, key=get_partition_num)
         for f in sorted_files:
             series = self._loadBinaryFromPath(f, dtype)
