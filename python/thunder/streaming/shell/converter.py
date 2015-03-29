@@ -139,8 +139,8 @@ class Series(Data):
 
     def _loadBinaryFromPath(self, p, dtype):
         # Load each line according to record_size and dtype
-        print "Before file load/buffering" 
         fbuf = open(p, 'rb').read()
+        print "file: %s, len(fbuf): %d, len(fbuf)/64.0: %f" % (p, len(fbuf), len(fbuf) / 8.0)
         return np.frombuffer(fbuf, dtype=dtype)
 
     def _saveBinaryToPath(self, p, data):

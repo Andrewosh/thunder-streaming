@@ -29,7 +29,7 @@ class Analysis(MappedScalaClass, ParamListener):
         # Period with which the FileMonitor will check for new data directories
         DIR_POLL_PERIOD = 1
         # Period with which the FileMonitor will check monitored directories for new files
-        FILE_POLL_PERIOD = 1
+        FILE_POLL_PERIOD = 2
         # Time between each poll
         WAIT_PERIOD = 0.5
 
