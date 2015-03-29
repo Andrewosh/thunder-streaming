@@ -197,7 +197,7 @@ class Series(Data):
         """
         # TODO implement saving with keys as well
         if path:
-            fullPath = path if not prefix else path + '-' + time.time()
+            fullPath = path if not prefix else path + '-' + str(time.time())
             fullPath = fullPath + '.' + fileType
             self._saveBinaryToPath(fullPath, data)
         else:
