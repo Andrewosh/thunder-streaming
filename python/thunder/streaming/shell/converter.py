@@ -137,29 +137,16 @@ class Series(Data):
             print "Cannot load binary series: %s" % str(e)
             return None, None
 
-    def _loadBinaryFromPath(self, p, record_size, dtype):
+    def _loadBinaryFromPath(self, p, dtype):
         # Load each line according to record_size and dtype
         fbuf = open(p, 'rb').read()
-        fsize = len(fbuf)
-        ptr = 0
-        while fsize - ptr != 0:
-            idx = struct.unpack("<i", fbuf[ptr:(ptr + 4)])[0]
-            buf = np.frombuffer(fbuf, dtype=dtype, count=record_size, offset=ptr + 4)
-            ptr += 4 + record_size * 8
-            yield idx, buf
+        return np.frombuffer(fbuf, dtype=dtype)
 
     def _saveBinaryToPath(self, p, data):
         with open(p, 'wb') as f:
-            vals = None
-            if isinstance(data, dict):
-                vals = map(lambda x: data[x], sorted(data))
-            elif isinstance(data, list):
-                vals = sorted(data)
-            arr = np.array(vals)
-            np.save(f, arr)
+            np.save(f, data)
 
     def _convert(self, root, new_data):
-        records = OrderedDict()
 
         # Load in the dimension JSON file (which we assume exists in the results directory)
         record_size, dtype = self._get_dims(root)
@@ -167,27 +154,25 @@ class Series(Data):
             return None
         self.dtype = dtype
 
+        merged_series = np.array()
         for f in new_data:
             # Make sure to exclude the dimensions file
             if not self.DIMS_PATTERN.search(f):
-                # Load each line according to record_size and dtype
-                for idx, buf in self._loadBinaryFromPath(f, record_size, dtype):
-                    records[idx] = buf
-        return records
+                fbuf = self._loadBinaryFromPath(f, dtype)
+                series = fbuf.reshape(-1, record_size)
+                np.append(merged_series, series)
+        return merged_series
 
     @Data.output
     def toLightning(self, data, lgn, only_viz=False):
         if data is None or len(data) == 0:
             return
-        # Make sure the values are sorted
-        sorted_vals = map(lambda x: data[x], sorted(data))
-        arr_values = np.array(sorted_vals)
         if only_viz:
-            print "Appending %s to existing line viz." % str(arr_values)
-            lgn.append(arr_values)
+            print "Appending %s to existing line viz." % str(data)
+            lgn.append(data)
         else:
             # Do dashboard stuff here
-            lgn.line(arr_values)
+            lgn.line(data)
 
     @Data.output
     def toFile(self, data, path=None, prefix=None, fileType='bin'):
@@ -224,12 +209,10 @@ class Image(Series):
         return Image(analysis, dims, clip)
 
     def _convert(self, root, new_data):
-        records = Series._convert(self, root, new_data)
+        series = Series._convert(self, root, new_data)
         if records is not None:
             # Sort the keys/values
-            sorted_vals = map(lambda x: records[x], sorted(records))
-            only_vals = [value[0] for value in sorted_vals]
-            image_arr = np.asarray(only_vals).clip(0, self.clip).reshape(self.dims)
+            image_arr = series.clip(0, self.clip).reshape(self.dims)
             return image_arr
 
     def _getPlaneData(self, data, plane):
