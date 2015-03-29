@@ -250,7 +250,3 @@ class Image(Series):
             # Do dashboard stuff here
             lgn.image(plane_data)
 
-    @Data.output
-    def toFile(self, data, path=None, prefix=None, fileType='img'):
-        Series._saveBinaryToPath(self, prefix, fileType)
-
