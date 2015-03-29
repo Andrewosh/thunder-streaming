@@ -190,15 +190,18 @@ class Series(Data):
             lgn.line(arr_values)
 
     @Data.output
-    def toFile(self, path, data, prefix=None, fileType='bin'):
+    def toFile(self, data, path=None, prefix=None, fileType='bin'):
         """
         If prefix is specified, a different file will be written out at every batch. If not, the same image file will be
         overwritten.
         """
         # TODO implement saving with keys as well
-        fullPath = path if not prefix else path + '-' + time.time()
-        fullPath = fullPath + '.' + fileType
-        self._saveBinaryToPath(fullPath, data)
+        if path:
+            fullPath = path if not prefix else path + '-' + time.time()
+            fullPath = fullPath + '.' + fileType
+            self._saveBinaryToPath(fullPath, data)
+        else:
+            print "Path not specified in toFile."
 
 
 class Image(Series):
@@ -248,6 +251,6 @@ class Image(Series):
             lgn.image(plane_data)
 
     @Data.output
-    def toFile(self, path, data, prefix=None, fileType='img'):
+    def toFile(self, data, path=None, prefix=None, fileType='img'):
         Series._saveBinaryToPath(self, prefix, fileType)
 
