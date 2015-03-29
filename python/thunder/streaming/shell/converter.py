@@ -150,6 +150,14 @@ class Series(Data):
 
     def _convert(self, root, new_data):
 
+        num_output_files = len(new_data) - 1
+
+        def get_partition_num(output_name)
+            split_name = output_name.split('-')
+            if len(split_name == 3):
+                return int(split_name[1])
+            return num_output_files
+
         # Load in the dimension JSON file (which we assume exists in the results directory)
         record_size, dtype = self._get_dims(root)
         if not record_size or not dtype:
@@ -157,11 +165,11 @@ class Series(Data):
         self.dtype = dtype
 
         merged_series = np.array([], dtype=dtype)
-        for f in new_data:
-            # Make sure to exclude the dimensions file
-            if not self.DIMS_PATTERN.search(f):
-                series = self._loadBinaryFromPath(f, dtype)
-                merged_series = np.append(merged_series, series)
+        without_dims = new_data.filter(lambda x: not self.DIMS_PATTERN.search(x))
+        sorted_files = sorted(without_dims, key=get_partition_num)
+        for f in sorted_files:
+            series = self._loadBinaryFromPath(f, dtype)
+            merged_series = np.append(merged_series, series)
         reshaped_series = merged_series.reshape(-1, record_size)
         print "reshaped_series.shape: %s" % str(reshaped_series.shape)
         return reshaped_series

@@ -45,12 +45,12 @@ class StreamingSeries(val dstream: DStream[(Int, Array[Double])])
       new File(subDir).mkdir()
 
       val writer = new BinaryWriter(subDir, prefix)
-      // Write out the dimensions file
       val dims = Map[String, String](
         ("record_size", (if (rdd.count() != 0) rdd.first()._2.length else 0).toString),
         ("dtype", "float64")
       ).toJson
 
+      // Write out the dimensions file
       val pw = new PrintWriter(new File(subDir, "dimensions.json"))
       pw.print(dims.toString())
       pw.close()
@@ -58,7 +58,7 @@ class StreamingSeries(val dstream: DStream[(Int, Array[Double])])
       val writeShard = (context: TaskContext, part: Iterator[(Int, Array[Double])]) => {
         writer.withoutKeys(part, time, context.partitionId)
       }
-      rdd.context.runJob(rdd.sortByKey(), writeShard)
+      rdd.context.runJob(rdd.sortByKey().coalesce(100), writeShard)
     }
   }
 
