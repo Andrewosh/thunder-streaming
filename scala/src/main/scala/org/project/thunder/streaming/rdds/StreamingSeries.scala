@@ -53,9 +53,9 @@ class StreamingSeries(val dstream: DStream[(Int, Array[Double])])
       pw.close()
 
       val writeShard = (context: TaskContext, part: Iterator[(Int, Array[Double])]) => {
-        writer.withKeys(part, time, context.partitionId)
+        writer.withoutKeys(part, time, context.partitionId)
       }
-      rdd.context.runJob(rdd, writeShard)
+      rdd.context.runJob(rdd.sortByKey(), writeShard)
     }
   }
 
