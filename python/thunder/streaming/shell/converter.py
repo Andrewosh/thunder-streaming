@@ -154,7 +154,7 @@ class Series(Data):
 
         def get_partition_num(output_name):
             split_name = output_name.split('-')
-            if len(split_name == 3):
+            if len(split_name) == 3:
                 return int(split_name[1])
             return num_output_files
 
