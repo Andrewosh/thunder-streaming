@@ -159,7 +159,7 @@ class Series(Data):
             # Make sure to exclude the dimensions file
             if not self.DIMS_PATTERN.search(f):
                 fbuf = self._loadBinaryFromPath(f, dtype)
-                np.append(merged_series, series)
+                merged_series = np.append(merged_series, series)
         reshaped_series = merged_series.reshape(-1, record_size)
         print "reshaped_series.shape: %s" % str(reshaped_series.shape)
         return reshaped_series
