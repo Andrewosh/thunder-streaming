@@ -156,7 +156,7 @@ class Series(Data):
             return None
         self.dtype = dtype
 
-        merged_series = np.array()
+        merged_series = np.array([], dtype=dtype)
         for f in new_data:
             # Make sure to exclude the dimensions file
             if not self.DIMS_PATTERN.search(f):
