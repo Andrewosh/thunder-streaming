@@ -161,9 +161,10 @@ class Series(Data):
             # Make sure to exclude the dimensions file
             if not self.DIMS_PATTERN.search(f):
                 fbuf = self._loadBinaryFromPath(f, dtype)
-                series = fbuf.reshape(-1, record_size)
                 np.append(merged_series, series)
-        return merged_series
+        reshaped_series = merged_series.reshape(-1, record_size)
+        print "reshaped_series.shape: %d" % reshaped_series.shape
+        return reshaped_series
 
     @Data.output
     def toLightning(self, data, lgn, only_viz=False):
