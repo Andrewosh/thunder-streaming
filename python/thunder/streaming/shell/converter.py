@@ -138,15 +138,13 @@ class Series(Data):
             return None, None
 
     def _loadBinaryFromPath(self, p, dtype):
-        # Load each line according to record_size and dtype
         fbuf = open(p, 'rb').read()
-        print "file: %s, len(fbuf): %d, len(fbuf)/64.0: %f" % (p, len(fbuf), len(fbuf) / 8.0)
-        return np.frombuffer(fbuf, dtype=dtype)
+        return fbuf
 
     def _saveBinaryToPath(self, p, data):
         print "In _saveBinaryToPath, saving to: %s" % p
         with open(p, 'wb') as f:
-            np.save(f, data)
+            f.write(data)
 
     def _convert(self, root, new_data):
 
@@ -164,14 +162,16 @@ class Series(Data):
             return None
         self.dtype = dtype
 
-        merged_series = np.array([], dtype=dtype)
+        #merged_series = np.array([], dtype=dtype)
         without_dims = filter(lambda x: not self.DIMS_PATTERN.search(x), new_data)
         sorted_files = sorted(without_dims, key=get_partition_num)
+        bytes = ''
         for f in sorted_files:
             series = self._loadBinaryFromPath(f, dtype)
-            merged_series = np.append(merged_series, series)
+            bytes = bytes + series
+            #merged_series = np.append(merged_series, series)
+        merged_series = np.frombuffer(bytes, dtype=dtype)
         reshaped_series = merged_series.reshape(-1, record_size)
-        print "reshaped_series.shape: %s" % str(reshaped_series.shape)
         return reshaped_series
 
     @Data.output
@@ -192,7 +192,6 @@ class Series(Data):
         overwritten.
         """
         # TODO implement saving with keys as well
-        print "In Series.toFile..."
         if path:
             fullPath = path if not prefix else path + '-' + str(time.time())
             fullPath = fullPath + '.' + fileType
@@ -223,6 +222,8 @@ class Image(Series):
     def _convert(self, root, new_data):
         series = Series._convert(self, root, new_data)
         if series is not None and len(series) != 0:
+            # Remove the regressors
+            series = series[:-3]
             # Sort the keys/values
             image_arr = series.clip(0, self.clip).reshape(self.dims)
             return image_arr
