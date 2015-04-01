@@ -240,7 +240,7 @@ class Image(Series):
         curData = data
         totalSize = cumprod(data.shape)[-1]
         for idx, dim in enumerate(data.shape):
-            curData = decimate(curData, max(1, int(ceil(factor * (dim / totalSize)))), axis=idx)
+            curData = decimate(curData, max(1, int(ceil(factor * (float(dim) / totalSize)))), axis=idx)
         return curData
 
     @Data.output
