@@ -255,7 +255,7 @@ class Image(Series):
             return
         plane_data = self._getPlaneData(data, plane)
         plane_data = self._downsample(plane_data)
-        print "Sending data with dims: %s to Lightning" % str(plane_data.shape)
+        print "Sending data with dims: %s to Lightning, regressors: %s" % (str(plane_data.shape), str(regressors))
         if only_viz:
             image_viz.update(plane_data)
             behav_viz.update(regressors)
