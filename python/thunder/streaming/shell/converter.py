@@ -254,7 +254,7 @@ class Image(Series):
             print "Invalid images dimensions (must be < 3 and >= 1)"
             return
         plane_data = self._getPlaneData(data, plane)
-        factor = float(cumprod(image_dims)[-1]) / cumprod(plane_data.shape)[-1]
+        factor = float(cumprod(plane_data.shape)[-1]) / cumprod(image_dims)[-1]
         plane_data = self._downsample(plane_data, factor=factor)
         print "Sending data with dims: %s to Lightning, regressors: %s" % (str(plane_data.shape), str(regressors))
         if only_viz:
