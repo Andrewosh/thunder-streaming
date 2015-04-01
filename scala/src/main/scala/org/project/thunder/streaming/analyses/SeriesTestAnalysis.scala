@@ -137,6 +137,7 @@ class SeriesFilteringRegressionAnalysis(tssc: ThunderStreamingContext, params: A
 
   val partitionSize = params.getSingleParam("partition_size").toInt
   val dims = params.getSingleParam("dims").parseJson.convertTo[List[Int]]
+  val numRegressors = params.getSingleParam("num_regressors").parseJson.convertTo[Int]
 
   def getKeysFromJson(keySet: Option[String], dims: List[Int]): List[Set[Int]]= {
     val parsedKeys = keySet match {
@@ -157,6 +158,7 @@ class SeriesFilteringRegressionAnalysis(tssc: ThunderStreamingContext, params: A
   }
 
   def analyze(data: StreamingSeries): StreamingSeries = {
+
     val filteredData = data.dstream.transform { rdd =>
 
       val keySet = UpdatableParameters.getUpdatableParam("keySet")
@@ -184,11 +186,13 @@ class SeriesFilteringRegressionAnalysis(tssc: ThunderStreamingContext, params: A
       val avgSeries = meanSeries.map{ case (idx, meanArray) => (idx, meanArray.sliding(partitionSize).map(x => x.reduce(_+_) / x.size).toArray[Double]) }
       println("avgSeries.first(): %s".format(avgSeries.first().toString))
       avgSeries
-
-      // Run regression on the behavioral variables in the original series
-      
     }
-    new StreamingSeries(filteredData)
+
+    val totalSize = dims.foldLeft(1)(_ * _)
+    // For now, assume the regressors are the final numRegressors keys
+    val featureKeys = ((totalSize - numRegressors) to (totalSize - 1)).toArray
+    val selectedKeys = featureKeys.take(1)
+    StatefulLinearRegression.run(new StreamingSeries(filteredData), featureKeys, selectedKeys)
   }
 }
 
