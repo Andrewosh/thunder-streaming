@@ -132,6 +132,66 @@ class SeriesFiltering2Analysis(tssc: ThunderStreamingContext, params: AnalysisPa
   }
 }
 
+class SeriesFilteringRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
+    extends SeriesTestAnalysis(tssc, params) {
+
+  val partitionSize = params.getSingleParam("partition_size").toInt
+  val dims = params.getSingleParam("dims").parseJson.convertTo[List[Int]]
+
+  def getKeysFromJson(keySet: Option[String], dims: List[Int]): List[Set[Int]]= {
+    val parsedKeys = keySet match {
+        case Some(s) => {
+          JsonParser(s).convertTo[List[List[List[Double]]]]
+        }
+        case _ => List()
+    }
+    val keys = parsedKeys.map(_.map(key => {
+        key.zipWithIndex.foldLeft(0){ case (sum, (dim, idx)) => (sum + (dims(idx) * dim)).toInt }
+    }).toSet[Int])
+    println("keys: %s, dims: %s".format(keys.toString, dims.toString))
+    keys
+  }
+
+  override def handleUpdate(update: (String, String)): Unit = {
+    UpdatableParameters.setUpdatableParam("keySet", update._2)
+  }
+
+  def analyze(data: StreamingSeries): StreamingSeries = {
+    val filteredData = data.dstream.transform { rdd =>
+
+      val keySet = UpdatableParameters.getUpdatableParam("keySet")
+
+      val keys = getKeysFromJson(keySet, dims)
+
+      val withIndices = keys.zipWithIndex
+      val setSizes = withIndices.foldLeft(Map[Int, Int]()) {
+        (curMap, s) => curMap + (s._2 -> s._1.size)
+      }
+
+      // Reindex the (k,v) pairs with their set inclusion values as K
+      println("Before first RDD operation")
+      val mappedKeys = rdd.flatMap { case (k, v) =>
+        val setMatches = withIndices.map { case (set, i) => if (set.contains(k)) (i, v) else (-1, v)}
+        setMatches.filter { case (k, v) => k != -1}
+      }
+      println("After first RDD operation")
+
+      // For each set, compute the mean time series (pointwise addition divided by set size)
+      val sumSeries = mappedKeys.reduceByKey((arr1, arr2) => arr1.zip(arr2).map { case (v1, v2) => v1 + v2})
+      val meanSeries = sumSeries.map { case (idx, sumArr) => (idx, sumArr.map(x => x / setSizes(idx)))}
+
+      // Do some temporal averaging on the (spatial) mean time series
+      val avgSeries = meanSeries.map{ case (idx, meanArray) => (idx, meanArray.sliding(partitionSize).map(x => x.reduce(_+_) / x.size).toArray[Double]) }
+      println("avgSeries.first(): %s".format(avgSeries.first().toString))
+      avgSeries
+
+      // Run regression on the behavioral variables in the original series
+      
+    }
+    new StreamingSeries(filteredData)
+  }
+}
+
 class SeriesNoopAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
     extends SeriesTestAnalysis(tssc, params) {
   def analyze(data: StreamingSeries): StreamingSeries = {
@@ -163,17 +223,6 @@ class SeriesCombinedAnalysis(tssc: ThunderStreamingContext, params: AnalysisPara
     val secondMeans = data.seriesMean()
     new StreamingSeries(secondMeans.dstream.union(means.dstream.union(stats.dstream)))
   }
-
-//class SeriesRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
-//    extends SeriesTestAnalysis(tssc, params) {
-//  def analyze(data: StreamingSeries): StreamingSeries = {
-//    val slr = new StatefulLinearRegression()
-//    val fittedStream = slr.runStreaming(data.dstream)
-//    val weightsStream = fittedStream.map{case (key, model) => (key, model.weights)}
-//    new StreamingSeries(weightsStream)
-//  }
 }
-
-
 
 

@@ -226,11 +226,12 @@ class Image(Series):
         series = Series._convert(self, root, new_data)
         if series is not None and len(series) != 0:
             # Remove the regressors
+            regressors = series[-3:]
             series = series[:-3]
             # Sort the keys/values
             image_arr = series.clip(0, self.clip).reshape(self.dims)
             print "_convert returning array of shape %s" % str(image_arr.shape)
-            return image_arr
+            return regressors, image_arr
 
     def _getPlaneData(self, data, plane):
         return data[plane, :, :]
@@ -243,10 +244,12 @@ class Image(Series):
         return curData
 
     @Data.output
-    def toLightning(self, data, lgn, plane=0, only_viz=False):
-        if data is None or len(data) == 0:
+    def toLightning(self, data, image_viz, behav_viz, plane=0, only_viz=False):
+        if data is None or len(data[1]) == 0:
             return
-        print "In toLightning..., data.shape: %s" % str(data.shape)
+        # Split the data into the image data and the regressors
+        regressors, data = data
+        print "In toLightning..., data.shape: %s, regressors.shape: %s" % (str(data.shape), str(regressors.shape))
         if len(self.dims) > 3 or len(self.dims) < 1:
             print "Invalid images dimensions (must be < 3 and >= 1)"
             return
@@ -254,7 +257,8 @@ class Image(Series):
         plane_data = self._downsample(plane_data)
         print "Sending data with dims: %s to Lightning" % str(plane_data.shape)
         if only_viz:
-            lgn.update(plane_data)
+            image_viz.update(plane_data)
+            behav_viz.update(regressors)
         else:
             # Do dashboard stuff here
             lgn.image(plane_data)
