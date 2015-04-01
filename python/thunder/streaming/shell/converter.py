@@ -229,6 +229,7 @@ class Image(Series):
             series = series[:-3]
             # Sort the keys/values
             image_arr = series.clip(0, self.clip).reshape(self.dims)
+            print "_convert returning array of shape %s" % str(image_arr.shape)
             return image_arr
 
     def _getPlaneData(self, data, plane):
