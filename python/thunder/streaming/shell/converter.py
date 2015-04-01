@@ -244,22 +244,19 @@ class Image(Series):
         return curData
 
     @Data.output
-    def toLightning(self, data, image_viz, behav_viz, image_dims, plane=0, only_viz=False):
+    def toLightning(self, data, image_viz, image_dims, plane=0, only_viz=False):
         if data is None or len(data[1]) == 0:
             return
-        # Split the data into the image data and the regressors
-        regressors, data = data
-        print "In toLightning..., data.shape: %s, regressors.shape: %s" % (str(data.shape), str(regressors.shape))
+        print "In toLightning..., data.shape: %s" % str(data.shape)
         if len(self.dims) > 3 or len(self.dims) < 1:
             print "Invalid images dimensions (must be < 3 and >= 1)"
             return
         plane_data = self._getPlaneData(data, plane)
         factor = float(cumprod(plane_data.shape)[-1]) / cumprod(image_dims)[-1]
         plane_data = self._downsample(plane_data, factor=factor)
-        print "Sending data with dims: %s to Lightning, regressors: %s" % (str(plane_data.shape), str(regressors))
+        print "Sending data with dims: %s to Lightning" % str(plane_data.shape)
         if only_viz:
             image_viz.update(plane_data)
-            behav_viz.update(regressors)
         else:
             # Do dashboard stuff here
             lgn.image(plane_data)

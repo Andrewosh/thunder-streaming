@@ -128,6 +128,24 @@ class SeriesFiltering2Analysis(tssc: ThunderStreamingContext, params: AnalysisPa
   }
 }
 
+class SeriesRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
+    extends SeriesTestAnalysis(tssc, params) {
+
+  val dims = params.getSingleParam("dims").parseJson.convertTo[List[Int]]
+  val numRegressors = params.getSingleParam("num_regressors").parseJson.convertTo[Int]
+  val selected = params.getSingleParam("selected").parseJson.convertTo[Int]
+
+  def analyze(data: StreamingSeries): StreamingSeries = {
+
+    val totalSize = dims.foldLeft(1)(_ * _)
+    // For now, assume the regressors are the final numRegressors keys
+    val featureKeys = ((totalSize - numRegressors) to (totalSize - 1)).toArray
+    val selectedKeys = featureKeys.take(selected)
+    val selectedKeySet = selectedKeys.toSet[Int]
+    new StreamingSeries(StatefulLinearRegression.run(data, featureKeys, selectedKeys).dstream.map { case (k, v) => (k, Array(v(0))) })
+  }
+}
+
 class SeriesFilteringRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
     extends SeriesTestAnalysis(tssc, params) {
 
@@ -135,18 +153,17 @@ class SeriesFilteringRegressionAnalysis(tssc: ThunderStreamingContext, params: A
   val dims = params.getSingleParam("dims").parseJson.convertTo[List[Int]]
   val numRegressors = params.getSingleParam("num_regressors").parseJson.convertTo[Int]
 
-  def getKeysFromJson(keySet: Option[String], dims: List[Int]): List[Set[Int]]= {
+  def getKeysFromJson(keySet: Option[String], existingKeys: Set[Int], dims: List[Int]): List[Set[Int]]= {
     val parsedKeys = keySet match {
         case Some(s) => {
           JsonParser(s).convertTo[List[List[List[Double]]]]
         }
         case _ => List()
     }
-    val keys = parsedKeys.map(_.map(key => {
+    val keys: List[Set[Int]] = parsedKeys.map(_.map(key => {
         key.zipWithIndex.foldLeft(0){ case (sum, (dim, idx)) => (sum + (dims(idx) * dim)).toInt }
     }).toSet[Int])
-    println("keys: %s, dims: %s".format(keys.toString, dims.toString))
-    keys
+    existingKeys +: keys
   }
 
   override def handleUpdate(update: (String, String)): Unit = {
@@ -155,11 +172,17 @@ class SeriesFilteringRegressionAnalysis(tssc: ThunderStreamingContext, params: A
 
   def analyze(data: StreamingSeries): StreamingSeries = {
 
+    val totalSize = dims.foldLeft(1)(_ * _)
+    // For now, assume the regressors are the final numRegressors keys
+    val featureKeys = ((totalSize - numRegressors) to (totalSize - 1)).toArray
+    val selectedKeys = featureKeys.take(1)
+    val selectedKeySet = selectedKeys.toSet[Int]
+
     val filteredData = data.dstream.transform { rdd =>
 
       val keySet = UpdatableParameters.getUpdatableParam("keySet")
 
-      val keys = getKeysFromJson(keySet, dims)
+      val keys = getKeysFromJson(keySet, selectedKeySet, dims)
 
       val withIndices = keys.zipWithIndex
       val setSizes = withIndices.foldLeft(Map[Int, Int]()) {
@@ -181,10 +204,7 @@ class SeriesFilteringRegressionAnalysis(tssc: ThunderStreamingContext, params: A
       avgSeries
     }
 
-    val totalSize = dims.foldLeft(1)(_ * _)
-    // For now, assume the regressors are the final numRegressors keys
-    val featureKeys = ((totalSize - numRegressors) to (totalSize - 1)).toArray
-    val selectedKeys = featureKeys.take(1)
+    println("featureKeys: %s, selectedKeys: %s".format(featureKeys.mkString(","), selectedKeys.mkString(",")))
     StatefulLinearRegression.run(new StreamingSeries(filteredData), featureKeys, selectedKeys)
   }
 }
