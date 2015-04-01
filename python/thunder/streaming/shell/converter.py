@@ -244,7 +244,7 @@ class Image(Series):
         return curData
 
     @Data.output
-    def toLightning(self, data, image_viz, behav_viz, plane=0, only_viz=False):
+    def toLightning(self, data, image_viz, behav_viz, image_dims, plane=0, only_viz=False):
         if data is None or len(data[1]) == 0:
             return
         # Split the data into the image data and the regressors
@@ -254,7 +254,8 @@ class Image(Series):
             print "Invalid images dimensions (must be < 3 and >= 1)"
             return
         plane_data = self._getPlaneData(data, plane)
-        plane_data = self._downsample(plane_data)
+        factor = float(cumprod(image_dims)[-1]) / cumprod(plane_data.shape)[-1]
+        plane_data = self._downsample(plane_data, factor=factor)
         print "Sending data with dims: %s to Lightning, regressors: %s" % (str(plane_data.shape), str(regressors))
         if only_viz:
             image_viz.update(plane_data)
