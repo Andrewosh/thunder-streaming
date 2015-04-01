@@ -226,12 +226,11 @@ class Image(Series):
         series = Series._convert(self, root, new_data)
         if series is not None and len(series) != 0:
             # Remove the regressors
-            regressors = series[-3:]
             series = series[:-3]
             # Sort the keys/values
             image_arr = series.clip(0, self.clip).reshape(self.dims)
             print "_convert returning array of shape %s" % str(image_arr.shape)
-            return regressors, image_arr
+            return image_arr
 
     def _getPlaneData(self, data, plane):
         return data[plane, :, :]
@@ -245,7 +244,7 @@ class Image(Series):
 
     @Data.output
     def toLightning(self, data, image_viz, image_dims, plane=0, only_viz=False):
-        if data is None or len(data[1]) == 0:
+        if data is None or len(data) == 0:
             return
         print "In toLightning..., data.shape: %s" % str(data.shape)
         if len(self.dims) > 3 or len(self.dims) < 1:
