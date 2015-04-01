@@ -238,9 +238,9 @@ class Image(Series):
 
     def _downsample(self, data, factor=4):
         curData = data
-        totalSize = cumprod(data.shape)[-1]
+        numDims = len(data.shape)
         for idx, dim in enumerate(data.shape):
-            curData = decimate(curData, max(1, int(ceil(factor * (float(dim) / totalSize)))), axis=idx)
+            curData = decimate(curData, int(max(1, ceil(factor ** (1.0 / numDims)))), axis=idx)
         return curData
 
     @Data.output
