@@ -3,6 +3,9 @@ from thunder.streaming.shell.analysis import Analysis
 from abc import abstractmethod
 from collections import OrderedDict
 import numpy as np
+from numpy import cumprod
+from scipy.signal import decimate
+from math import ceil
 import re
 import os
 import json
@@ -229,7 +232,14 @@ class Image(Series):
             return image_arr
 
     def _getPlaneData(self, data, plane):
-        return data[:,:,plane]
+        return data[plane, :, :]
+
+    def _downsample(self, data, factor=4):
+        curData = data
+        totalSize = cumprod(data.shape)[-1]
+        for idx, dim in enumerate(data.shape):
+            curData = decimate(curData, int(ceil(factor * (dim / totalSize))), axis=idx)
+        return curData
 
     @Data.output
     def toLightning(self, data, lgn, plane=0, only_viz=False):
@@ -239,6 +249,8 @@ class Image(Series):
             print "Invalid images dimensions (must be < 3 and >= 1)"
             return
         plane_data = self._getPlaneData(data, plane)
+        plane_data = self._downsample(plane_data)
+        print "Sending data with dims: %s to Lightning" % str(plane_data.shape)
         if only_viz:
             lgn.update(plane_data)
         else:
