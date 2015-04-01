@@ -243,9 +243,9 @@ class Image(Series):
 
     @Data.output
     def toLightning(self, data, lgn, plane=0, only_viz=False):
-        print "In toLightning..., data.shape: %s" % str(data.shape)
         if data is None or len(data) == 0:
             return
+        print "In toLightning..., data.shape: %s" % str(data.shape)
         if len(self.dims) > 3 or len(self.dims) < 1:
             print "Invalid images dimensions (must be < 3 and >= 1)"
             return
