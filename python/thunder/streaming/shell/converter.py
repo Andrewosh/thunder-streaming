@@ -254,7 +254,7 @@ class Image(Series):
             return
         plane_data = self._getPlaneData(data, plane)
         factor = float(cumprod(plane_data.shape)[-1]) / cumprod(image_dims)[-1]
-        plane_data = self._downsample(plane_data, factor=factor)
+        #plane_data = self._downsample(plane_data, factor=factor)
         print "Sending data with dims: %s to Lightning" % str(plane_data.shape)
         if only_viz:
             image_viz.update(plane_data)
