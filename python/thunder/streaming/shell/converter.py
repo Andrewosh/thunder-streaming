@@ -208,25 +208,27 @@ class Image(Series):
     Represents a 2 or 3 dimensional image
     """
 
-    def __init__(self, analysis, dims, clip):
+    def __init__(self, analysis, dims, clip, preslice):
         Series.__init__(self, analysis)
         self.dims = dims
         self.clip = clip
+        self.preslice = preslice
 
     @staticmethod
     @Data.converter
-    def toImage(analysis, dims=(512, 512, 4), clip=400):
+    def toImage(analysis, dims=(512, 512, 4), clip=400, preslice=None):
         """
         :param analysis: The analysis whose raw output will be parsed and converted into an in-memory image
         :return: An Image object
         """
-        return Image(analysis, dims, clip)
+        return Image(analysis, dims, clip, preslice)
 
     def _convert(self, root, new_data):
         series = Series._convert(self, root, new_data)
         if series is not None and len(series) != 0:
             # Remove the regressors
-            series = series[:-3]
+            if self.preslice:
+                series = series[self.preslice]
             # Sort the keys/values
             image_arr = series.clip(0, self.clip).reshape(self.dims)
             print "_convert returning array of shape %s" % str(image_arr.shape)
