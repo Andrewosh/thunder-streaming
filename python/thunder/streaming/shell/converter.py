@@ -243,6 +243,7 @@ class Image(Series):
 
     @Data.output
     def toLightning(self, data, lgn, plane=0, only_viz=False):
+        print "In toLightning..."
         if data is None or len(data) == 0:
             return
         if len(self.dims) > 3 or len(self.dims) < 1:
