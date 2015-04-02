@@ -142,7 +142,9 @@ class SeriesRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisPa
     val featureKeys = ((totalSize - numRegressors) to (totalSize - 1)).toArray
     val selectedKeys = featureKeys.take(selected)
     val selectedKeySet = selectedKeys.toSet[Int]
-    new StreamingSeries(StatefulLinearRegression.run(data, featureKeys, selectedKeys).dstream.map { case (k, v) => (k, Array(v(0))) })
+    val regressionStream = StatefulLinearRegression.run(data, featureKeys, selectedKeys).dstream.map { case (k, v) => (k, Array(v(0))) }
+    regressionStream.checkpoint(data.interval)
+    new StreamingSeries(regressionStream)
   }
 }
 
@@ -152,6 +154,7 @@ class SeriesFilteringRegressionAnalysis(tssc: ThunderStreamingContext, params: A
   val partitionSize = params.getSingleParam("partition_size").toInt
   val dims = params.getSingleParam("dims").parseJson.convertTo[List[Int]]
   val numRegressors = params.getSingleParam("num_regressors").parseJson.convertTo[Int]
+
 
   def getKeysFromJson(keySet: Option[String], existingKeys: Set[Int], dims: List[Int]): List[Set[Int]]= {
     val parsedKeys = keySet match {
