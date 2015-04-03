@@ -1,15 +1,16 @@
 package org.project.thunder.streaming.regression
 
 import org.apache.spark.streaming.TestSuiteBase
+
 import org.apache.spark.streaming.dstream.DStream
 import org.project.thunder.streaming.rdds.StreamingSeries
-import org.scalatest.FunSuite
+import org.scalatest.{FunSuite, BeforeAndAfter}
 
 import scala.util.Random
 
 import org.project.thunder.streaming.util.TestUtils._
 
-class StatefulLinearRegressionSuite extends FunSuite with TestSuiteBase {
+class StatefulLinearRegressionSuite extends FunSuite with TestSuiteBase with BeforeAndAfter {
 
   override def maxWaitTimeMillis = 5000
 
@@ -45,8 +46,32 @@ class StatefulLinearRegressionSuite extends FunSuite with TestSuiteBase {
 
   test("weight accuracy (multiple features)") {
 
-    // are estimated weights correct
+    val numBatches = 10
+    val numPoints = 2
+    val numKeys = 5
+    val intercept = 1.0 // intercept for linear model
+    val weights = Array(2.0, 3.0, 4.0) // coefficients for linear model
+    val noise = 0.5 // noise level
+    val rand = new Random(42)
 
+    val input = RegressionStreamGenerator(
+      intercept, weights, rand, numBatches, numPoints, numKeys, noise)
+
+    val keyIndices = (1 to weights.length).map(x => numKeys + x)
+    val model = new StatefulLinearRegression()
+      .setFeatureKeys(Array(keyIndices:_*))
+      .setSelectedKeys(Array(keyIndices:_*))
+
+    val ssc = setupStreams(input, (inputDStream: DStream[(Int, Array[Double])]) => {
+      val series = new StreamingSeries(inputDStream)
+      model.fit(series)
+    })
+
+    val output: Seq[Seq[(Int, FittedModel)]] = runStreams(ssc, numBatches, numBatches)
+
+    output.last.foreach{ case (k, v) =>
+      assertEqual(v.weights, weights, 0.1)
+    }
   }
 
   test("convergence") {
@@ -79,11 +104,12 @@ class StatefulLinearRegressionSuite extends FunSuite with TestSuiteBase {
     noise: Double
   ): Seq[Seq[(Int, Array[Double])]] = {
     (0 until numBatches).map{ b =>
-      val x = Array.fill(numPoints)(rand.nextGaussian())
+      val x = Array.fill(numPoints)(weights.map(w => rand.nextGaussian()))
       (0 until numKeys).map{ k =>
-        val y = x.map(x => x * weights(0) + intercept + rand.nextGaussian() * noise)
+        val y = x.map(x => x.zipWithIndex.foldLeft(0.0){ case (sum, (i, idx)) => sum + (i * weights(idx)) }
+                    + intercept + rand.nextGaussian() * noise)
         (k, y)
-      } ++ Seq((numKeys + 1, x))
+      } ++ weights.zipWithIndex.map{ (w, idx) => (numKeys + idx + 1, x.map{ xi => xi(idx) }) }
     }
   }
 
