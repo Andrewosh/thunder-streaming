@@ -16,22 +16,27 @@ abstract class RegressionSuite extends FunSuite with TestSuiteBase {
   override def maxWaitTimeMillis = 5000
 
   var numBatches = 10
-  var numPoints = 20
+  var numPoints = 10
   var numKeys = 5
   var intercept = 1.0 // intercept for linear model
-  var noise = 0.5 // noise level
+  var noise = 1.0 // noise level
   var rand = new Random(42)
   var weights: Array[Double] = _
   var output: Seq[Seq[(Int, FittedModel)]] = _
 
-  def setup() {
-    println("weights: %s".format(weights.mkString(",")))
+  def getModel(featureKeys: Array[Int], selectedKeys: Array[Int]): StatefulLinearRegression = {
+    new StatefulLinearRegression().setFeatureKeys(featureKeys).setSelectedKeys(selectedKeys)
+  }
+
+  def getDefaultModel(): StatefulLinearRegression = {
+    val featureKeys =  (1 to weights.length).map{x => numKeys + x}.toArray[Int]
+    val selectedKeys = (1 to weights.length).map{x => numKeys + x}.toArray[Int]
+    getModel(featureKeys, selectedKeys)
+  }
+
+  def setup(model: StatefulLinearRegression = getDefaultModel()) {
     val input = RegressionStreamGenerator(
       intercept, weights, rand, numBatches, numPoints, numKeys, noise)
-
-    val model = new StatefulLinearRegression()
-      .setFeatureKeys(Array(numKeys + 1))
-      .setSelectedKeys(Array(numKeys + 1))
 
     val ssc = setupStreams(input, (inputDStream: DStream[(Int, Array[Double])]) => {
       val series = new StreamingSeries(inputDStream)
@@ -62,10 +67,7 @@ abstract class RegressionSuite extends FunSuite with TestSuiteBase {
 
   test("weight accuracy") {
     setup()
-
-    println("In weight accuracy: weights: %s".format(weights.mkString((","))))
     output.last.foreach{ case (k, v) =>
-      println("v.weights: %s".format(v.weights.mkString(",")))
       assertEqual(v.weights, weights, 0.1)
     }
   }
