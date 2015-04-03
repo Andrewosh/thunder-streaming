@@ -87,12 +87,12 @@ class StatefulLinearRegression (
     if ((currentCount != 0) & (n != 0)) {
 
       // append column of 1s
-      val X = DoubleFactory2D.dense.make(n, features.length + 1)
-      for (i <- 0 until n) {
+      val X = DoubleFactory2D.dense.make(currentCount, n + 1)
+      for (i <- 0 until currentCount) {
         X.set(i, 0, 1)
       }
-      for (i <- 0 until n ; j <- 1 until features.length + 1) {
-        X.set(i, j, features(i)(j))
+      for (i <- 0 until currentCount ; j <- 1 until (n + 1)) {
+        X.set(i, j, features(j - 1)(i))
       }
 
       // create matrix version of y
