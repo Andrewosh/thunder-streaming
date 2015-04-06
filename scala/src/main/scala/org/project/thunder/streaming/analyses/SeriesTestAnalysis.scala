@@ -133,21 +133,26 @@ class SeriesRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisPa
 
   val dims = params.getSingleParam("dims").parseJson.convertTo[List[Int]]
   val numRegressors = params.getSingleParam("num_regressors").parseJson.convertTo[Int]
-  val selected = params.getSingleParam("selected").parseJson.convertTo[Int]
+  val selected = params.getSingleParam("selected").parseJson.convertTo[Set[Int]]
 
   def analyze(data: StreamingSeries): StreamingSeries = {
 
     val totalSize = dims.foldLeft(1)(_ * _)
     // For now, assume the regressors are the final numRegressors keys
     val featureKeys = ((totalSize - numRegressors) to (totalSize - 1)).toArray
-    val selectedKeys = featureKeys.take(selected)
-    val selectedKeySet = selectedKeys.toSet[Int]
-    val regressionStream = StatefulLinearRegression.run(data, featureKeys, selectedKeys).dstream.map { case (k, v) => (k, Array(v(0))) }
+    val selectedKeys = featureKeys.zipWithIndex.filter{ case (f, idx) => featureKeys.contains(idx) }.map(_._1)
+    val regressionStream = StatefulLinearRegression.run(data, featureKeys, selectedKeys)
     regressionStream.checkpoint(data.interval)
-    new StreamingSeries(regressionStream)
+    // For up to 2 regressors, convert betas and r2 into a color map (by using the betas as RGB weights and R2 as alpha)
+    // TODO: This should be turned into some sort of a colorize function
+    val rgbStream = regressionStream.map{ case (k, model) => {
+      (k, model.normalizedBetas :+ model.r2)
+    }}
+    new StreamingSeries(rgbStream)
   }
 }
 
+/*
 class SeriesFilteringRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
     extends SeriesTestAnalysis(tssc, params) {
 
@@ -211,6 +216,7 @@ class SeriesFilteringRegressionAnalysis(tssc: ThunderStreamingContext, params: A
     StatefulLinearRegression.run(new StreamingSeries(filteredData), featureKeys, selectedKeys)
   }
 }
+*/
 
 class SeriesNoopAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
     extends SeriesTestAnalysis(tssc, params) {
