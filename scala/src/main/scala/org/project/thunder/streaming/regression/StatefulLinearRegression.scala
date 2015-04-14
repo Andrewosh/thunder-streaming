@@ -37,7 +37,7 @@ class FittedModel(
 
   def weights = beta.toArray.drop(1)
 
-  lazy val normalizedBetas = beta.toArray().zipWithIndex.map{ case (b, idx) => b / (betaMaxes(idx) - betaMins(idx)) }
+  def normalizedBetas = beta.toArray().zipWithIndex.map{ case (b, idx) => b / (betaMaxes(idx) - betaMins(idx)) }
 
 }
 
@@ -148,8 +148,8 @@ class StatefulLinearRegression (
 
       // update the ranges of the betas
       for (i <- 0 until n) {
-        updatedState.betaMins(i) = min(oldMins(i), updatedState.betaMins(i))
-        updatedState.betaMaxes(i) = max(oldMaxes(i), updatedState.betaMaxes(i))
+        updatedState.betaMins(i) = min(oldMins(i), newBeta.get(i))
+        updatedState.betaMaxes(i) = max(oldMaxes(i), newBeta.get(i))
       }
 
     }

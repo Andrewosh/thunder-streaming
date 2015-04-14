@@ -140,14 +140,17 @@ class SeriesRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisPa
     val totalSize = dims.foldLeft(1)(_ * _)
     // For now, assume the regressors are the final numRegressors keys
     val featureKeys = ((totalSize - numRegressors) to (totalSize - 1)).toArray
-    val selectedKeys = featureKeys.zipWithIndex.filter{ case (f, idx) => featureKeys.contains(idx) }.map(_._1)
+    val startIdx = totalSize - numRegressors
+    val selectedKeys = featureKeys.zipWithIndex.filter{ case (f, idx) => selected.contains(idx) }.map(_._1)
+    println("selectedKeys: %s".format(selectedKeys.mkString(",").toString))
     val regressionStream = StatefulLinearRegression.run(data, featureKeys, selectedKeys)
     regressionStream.checkpoint(data.interval)
     // For up to 2 regressors, convert betas and r2 into a color map (by using the betas as RGB weights and R2 as alpha)
     // TODO: This should be turned into some sort of a colorize function
     val rgbStream = regressionStream.map{ case (k, model) => {
-      (k, model.normalizedBetas :+ model.r2)
+      (k, (model.normalizedBetas :+ model.r2).map(d => d * 255.0))
     }}
+    rgbStream.map{ case (k,v) => (k, v.mkString(",")) }.print()
     new StreamingSeries(rgbStream)
   }
 }
