@@ -37,7 +37,7 @@ class FittedModel(
 
   def weights = beta.toArray.drop(1)
 
-  def normalizedBetas = beta.toArray().zipWithIndex.map{ case (b, idx) => (b - betaMins(idx) / (betaMaxes(idx) - betaMins(idx)) }
+  def normalizedBetas = beta.toArray().zipWithIndex.map{ case (b, idx) => (b - betaMins(idx)) / (betaMaxes(idx) - betaMins(idx)) }
 
 }
 
