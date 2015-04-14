@@ -82,9 +82,14 @@ class StatefulLinearRegression (
 
     val y = input.foldLeft(Array[Double]()) { (acc, i) => acc ++ i}
     val currentCount = y.size
-    val numFeatures = features.size
+
+    // The number of expected features, and the number contained in the batch
+    val numFeatures = featureKeys.size
+    val batchNumFeatures = features.size
+
     // Include the intercept term
     val n = numFeatures + 1
+    val nBatch = batchNumFeatures + 1
 
     val updatedState = state.getOrElse(new FittedModel(0.0, 0.0, 0.0, 0.0,
       DoubleFactory2D.dense.make(n, n), DoubleFactory1D.dense.make(n),
@@ -92,14 +97,14 @@ class StatefulLinearRegression (
       Array.fill(n)(Double.MaxValue),
       Array.fill(n)(Double.MinValue)))
 
-    if ((currentCount != 0) & (numFeatures != 0)) {
+    if ((currentCount != 0) & (batchNumFeatures != 0)) {
 
       // append column of 1s
       val X = DoubleFactory2D.dense.make(currentCount, n)
       for (i <- 0 until currentCount) {
         X.set(i, 0, 1)
       }
-      for (i <- 0 until currentCount ; j <- 1 until n) {
+      for (i <- 0 until currentCount ; j <- 1 until nBatch) {
         X.set(i, j, features(j - 1)(i))
       }
 
@@ -118,40 +123,49 @@ class StatefulLinearRegression (
       val oldMins = updatedState.betaMins
       val oldMaxes = updatedState.betaMaxes
 
-      // compute current estimates of all statistics
-      val currentMean = y.foldLeft(0.0)(_+_) / currentCount
-      val currentSumOfSquaresTotal = y.map(x => pow(x - currentMean, 2)).foldLeft(0.0)(_+_)
-      val currentXy = mult(transpose(X), ymat)
-      val currentXX = mult(transpose(X), X)
 
-      // compute new values for X*y (the sufficient statistic) and new beta (needed for update equations)
-      val newXX = oldXX.copy.assign(currentXX, plus)
-      val newXy = updatedState.Xy.copy.assign(currentXy, plus)
-      val newBeta = mult(inverse(newXX), newXy)
+      var newXX = oldXX
+      try {
+        // compute current estimates of all statistics
+        val currentMean = y.foldLeft(0.0)(_ + _) / currentCount
+        val currentSumOfSquaresTotal = y.map(x => pow(x - currentMean, 2)).foldLeft(0.0)(_ + _)
+        val currentXy = mult(transpose(X), ymat)
+        val currentXX = mult(transpose(X), X)
 
-      // compute terms for update equations
-      val delta = currentMean - oldMean
-      val term1 = ymat.copy.assign(mult(X, newBeta), minus).assign(bindArg2(pow, 2)).zSum
-      val term2 = mult(mult(oldXX, newBeta), newBeta)
-      val term3 = mult(mult(oldXX, oldBeta), oldBeta)
-      val term4 = 2 * mult(oldBeta.copy.assign(newBeta, minus), oldXy)
+        // compute new values for X*y (the sufficient statistic) and new beta (needed for update equations)
+        newXX = oldXX.copy.assign(currentXX, plus)
+        val newXy = updatedState.Xy.copy.assign(currentXy, plus)
+        val newBeta = mult(inverse(newXX), newXy)
 
-      // update the all statistics of the fitted model
-      updatedState.count += currentCount
-      updatedState.mean += (delta * currentCount / (oldCount + currentCount))
-      updatedState.Xy = newXy
-      updatedState.XX = newXX
-      updatedState.beta = newBeta
-      updatedState.sumOfSquaresTotal += currentSumOfSquaresTotal +
-        delta * delta * (oldCount * currentCount) / (oldCount + currentCount)
-      updatedState.sumOfSquaresError += term1 + term2 - term3 + term4
+        // compute terms for update equations
+        val delta = currentMean - oldMean
+        val term1 = ymat.copy.assign(mult(X, newBeta), minus).assign(bindArg2(pow, 2)).zSum
+        val term2 = mult(mult(oldXX, newBeta), newBeta)
+        val term3 = mult(mult(oldXX, oldBeta), oldBeta)
+        val term4 = 2 * mult(oldBeta.copy.assign(newBeta, minus), oldXy)
 
-      // update the ranges of the betas
-      for (i <- 0 until n) {
-        updatedState.betaMins(i) = min(oldMins(i), newBeta.get(i))
-        updatedState.betaMaxes(i) = max(oldMaxes(i), newBeta.get(i))
+        // update the all statistics of the fitted model
+        updatedState.count += currentCount
+        updatedState.mean += (delta * currentCount / (oldCount + currentCount))
+        updatedState.Xy = newXy
+        updatedState.XX = newXX
+        updatedState.beta = newBeta
+        updatedState.sumOfSquaresTotal += currentSumOfSquaresTotal +
+          delta * delta * (oldCount * currentCount) / (oldCount + currentCount)
+        updatedState.sumOfSquaresError += term1 + term2 - term3 + term4
+
+        // update the ranges of the betas
+        for (i <- 0 until nBatch) {
+          updatedState.betaMins(i) = min(oldMins(i), newBeta.get(i))
+          updatedState.betaMaxes(i) = max(oldMaxes(i), newBeta.get(i))
+        }
+
+      } catch {
+        case e: Exception => {
+          println("Caught linear algebra exception: %s".format(e.toString))
+          println("oldXX: %s, newXX: %s".format(oldXX.toString, newXX.toString))
+        }
       }
-
     }
     Some(updatedState)
   }
