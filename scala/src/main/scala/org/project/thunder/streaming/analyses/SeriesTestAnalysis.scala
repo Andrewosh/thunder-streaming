@@ -128,7 +128,7 @@ class SeriesFiltering2Analysis(tssc: ThunderStreamingContext, params: AnalysisPa
   }
 }
 
-class SeriesRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
+class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
     extends SeriesTestAnalysis(tssc, params) {
 
   val dims = params.getSingleParam("dims").parseJson.convertTo[List[Int]]
@@ -144,6 +144,33 @@ class SeriesRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisPa
     val selectedKeys = featureKeys.zipWithIndex.filter{ case (f, idx) => selected.contains(idx) }.map(_._1)
     println("selectedKeys: %s, featureKeys: %s".format(selectedKeys.mkString(","), featureKeys.mkString(",")))
     val regressionStream = StatefulLinearRegression.run(data, featureKeys, selectedKeys)
+    regressionStream.checkpoint(data.interval)
+    // For up to 2 regressors, convert betas and r2 into a color map (by using the betas as RGB weights and R2 as alpha)
+    // TODO: This should be turned into some sort of a colorize function
+    val rgbStream = regressionStream.map{ case (k, model) => {
+      (k, (model.normalizedBetas :+ model.r2).map(d => d * 255.0))
+    }}
+    rgbStream.map{ case (k,v) => (k, v.mkString(",")) }.print()
+    new StreamingSeries(rgbStream)
+  }
+}
+
+class SeriesBinnedRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
+  extends SeriesTestAnalysis(tssc, params) {
+
+  val dims = params.getSingleParam("dims").parseJson.convertTo[List[Int]]
+  val numRegressors = params.getSingleParam("num_regressors").parseJson.convertTo[Int]
+  val selected = params.getSingleParam("selected").parseJson.convertTo[Set[Int]]
+
+  def analyze(data: StreamingSeries): StreamingSeries = {
+
+    val totalSize = dims.foldLeft(1)(_ * _)
+    // For now, assume the regressors are the final numRegressors keys
+    val featureKeys = ((totalSize - numRegressors) to (totalSize - 1)).toArray
+    val startIdx = totalSize - numRegressors
+    val selectedKeys = featureKeys.zipWithIndex.filter{ case (f, idx) => selected.contains(idx) }.map(_._1)
+    println("selectedKeys: %s, featureKeys: %s".format(selectedKeys.mkString(","), featureKeys.mkString(",")))
+    val regressionStream = StatefulBinnedRegression.run(data, featureKeys, selectedKeys)
     regressionStream.checkpoint(data.interval)
     // For up to 2 regressors, convert betas and r2 into a color map (by using the betas as RGB weights and R2 as alpha)
     // TODO: This should be turned into some sort of a colorize function

@@ -13,7 +13,7 @@ import org.project.thunder.streaming.util.counters.{StatCounterMixed, StatUpdate
 /**
  * Stateful binned statistics
  */
-class StatefulBinnedStats (
+class StatefulBinnedRegression (
     var featureKey: Int,
     var nfeatures: Int)
   extends Serializable with Logging {
@@ -21,13 +21,13 @@ class StatefulBinnedStats (
   def this() = this(0, 1)
 
   /** Set which indices that correspond to features. */
-  def setFeatureKey(featureKey: Int): StatefulBinnedStats = {
+  def setFeatureKey(featureKey: Int): StatefulBinnedRegression = {
     this.featureKey = featureKey
     this
   }
 
   /** Set the values associated with the to features. */
-  def setFeatureCount(nfeatures: Int): StatefulBinnedStats = {
+  def setFeatureCount(nfeatures: Int): StatefulBinnedRegression = {
     this.nfeatures = nfeatures
     this
   }
@@ -55,7 +55,7 @@ class StatefulBinnedStats (
 /**
  * Top-level methods for calling Stateful Binned Stats.
  */
-object StatefulBinnedStats {
+object StatefulBinnedRegression {
 
   /**
    * Compute running statistics on keyed data points in bins.
@@ -69,13 +69,13 @@ object StatefulBinnedStats {
    * @param input StreamingSeries with keyed data
    * @return StreamingSeries with statistics
    */
-  def run(
+  def runToSeries(
     input: StreamingSeries,
     featureKey: Int,
     featureCount: Int,
     featureValues: Array[Double]): StreamingSeries =
   {
-    val output = new StatefulBinnedStats()
+    val output = new StatefulBinnedRegression()
       .setFeatureKey(featureKey)
       .setFeatureCount(featureCount)
       .fit(input)
@@ -84,4 +84,15 @@ object StatefulBinnedStats {
     new StreamingSeries(output)
   }
 
+  def run(
+     input: StreamingSeries,
+     featureKey: Int,
+     featureCount: Int,
+     featureValues: Array[Double]): DStream[(Int, StatCounterMixed)] = {
+
+    new StatefulBinnedRegression()
+      .setFeatureKey(featureKey)
+      .setFeatureCount(featureCount)
+      .fit(input)
+  }
 }
