@@ -3,7 +3,7 @@ package org.project.thunder.streaming.analyses
 import org.apache.spark.rdd.RDD
 import org.project.thunder.streaming.rdds.StreamingSeries
 
-import org.project.thunder.streaming.regression.StatefulLinearRegression
+import org.project.thunder.streaming.regression.{StatefulBinnedRegression, StatefulLinearRegression}
 import org.project.thunder.streaming.util.ThunderStreamingContext
 import org.apache.spark.SparkContext._
 
@@ -159,8 +159,9 @@ class SeriesBinnedRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
   extends SeriesTestAnalysis(tssc, params) {
 
   val dims = params.getSingleParam("dims").parseJson.convertTo[List[Int]]
+  val edges = params.getSingleParam("edges").parseJson.convertTo[List[Double]]
   val numRegressors = params.getSingleParam("num_regressors").parseJson.convertTo[Int]
-  val selected = params.getSingleParam("selected").parseJson.convertTo[Set[Int]]
+  val selected = params.getSingleParam("selected").parseJson.convertTo[Int]
 
   def analyze(data: StreamingSeries): StreamingSeries = {
 
@@ -168,17 +169,23 @@ class SeriesBinnedRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
     // For now, assume the regressors are the final numRegressors keys
     val featureKeys = ((totalSize - numRegressors) to (totalSize - 1)).toArray
     val startIdx = totalSize - numRegressors
-    val selectedKeys = featureKeys.zipWithIndex.filter{ case (f, idx) => selected.contains(idx) }.map(_._1)
-    println("selectedKeys: %s, featureKeys: %s".format(selectedKeys.mkString(","), featureKeys.mkString(",")))
-    val regressionStream = StatefulBinnedRegression.run(data, featureKeys, selectedKeys)
+    val selectedKey = featureKeys.zipWithIndex.filter{ case (f, idx) => selected == idx) }.map(_._1)(0)
+    println("selectedKeys: %d, featureKeys: %s".format(selectedKey, featureKeys.mkString(",")))
+
+    val regressionStream = StatefulBinnedRegression.run(data, selectedKey, edges)
     regressionStream.checkpoint(data.interval)
+    new StreamingSeries(regressionStream.map{ case (int, mixedCounter) => (int, mixedCounter.counterArray.mean))
+
+    // TODO Colorize
+      /*
     // For up to 2 regressors, convert betas and r2 into a color map (by using the betas as RGB weights and R2 as alpha)
     // TODO: This should be turned into some sort of a colorize function
-    val rgbStream = regressionStream.map{ case (k, model) => {
+    val rgbStream = regressionStream.map{ case (k, mixedCounter) => {
       (k, (model.normalizedBetas :+ model.r2).map(d => d * 255.0))
     }}
     rgbStream.map{ case (k,v) => (k, v.mkString(",")) }.print()
     new StreamingSeries(rgbStream)
+    */
   }
 }
 

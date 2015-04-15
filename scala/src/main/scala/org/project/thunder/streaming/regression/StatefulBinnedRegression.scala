@@ -72,14 +72,12 @@ object StatefulBinnedRegression {
   def runToSeries(
     input: StreamingSeries,
     featureKey: Int,
-    leftEdges: Int,
-    featureValues: Array[Double]): StreamingSeries =
+    leftEdges: Array[Double]): StreamingSeries =
   {
     val output = new StatefulBinnedRegression()
       .setFeatureKey(featureKey)
       .setLeftEdges(leftEdges)
       .fit(input)
-      .mapValues(x => Array(x.r2, x.weightedMean(featureValues)))
 
     new StreamingSeries(output)
   }
@@ -87,8 +85,7 @@ object StatefulBinnedRegression {
   def run(
      input: StreamingSeries,
      featureKey: Int,
-     leftEdges: Array[Double],
-     featureValues: Array[Double]): DStream[(Int, StatCounterMixed)] = {
+     leftEdges: Array[Double]): DStream[(Int, StatCounterMixed)] = {
 
     new StatefulBinnedRegression()
       .setFeatureKey(featureKey)
