@@ -16,6 +16,8 @@ import cern.colt.matrix.linalg.Algebra.DEFAULT.{inverse, mult, transpose}
 
 import org.project.thunder.streaming.util.io.Keys
 
+import scala.util.{Try, Success}
+
 /** Class for representing parameters and sufficient statistics for a running linear regression model */
 class FittedModel(
    var count: Double,
@@ -84,7 +86,7 @@ class StatefulLinearRegression (
     val currentCount = y.size
 
     // The number of expected features, and the number contained in the batch
-    val numFeatures = featureKeys.size
+    val numFeatures = selectedKeys.size
     val batchNumFeatures = features.size
 
     // Include the intercept term
@@ -123,48 +125,44 @@ class StatefulLinearRegression (
       val oldMins = updatedState.betaMins
       val oldMaxes = updatedState.betaMaxes
 
+      // compute current estimates of all statistics
+      val currentMean = y.foldLeft(0.0)(_ + _) / currentCount
+      val currentSumOfSquaresTotal = y.map(x => pow(x - currentMean, 2)).foldLeft(0.0)(_ + _)
+      val currentXy = mult(transpose(X), ymat)
+      val currentXX = mult(transpose(X), X)
 
-      var newXX = oldXX
-      try {
-        // compute current estimates of all statistics
-        val currentMean = y.foldLeft(0.0)(_ + _) / currentCount
-        val currentSumOfSquaresTotal = y.map(x => pow(x - currentMean, 2)).foldLeft(0.0)(_ + _)
-        val currentXy = mult(transpose(X), ymat)
-        val currentXX = mult(transpose(X), X)
+      // compute new values for X*y (the sufficient statistic) and new beta (needed for update equations)
+      val newXX = oldXX.copy.assign(currentXX, plus)
+      val newXy = updatedState.Xy.copy.assign(currentXy, plus)
 
-        // compute new values for X*y (the sufficient statistic) and new beta (needed for update equations)
-        newXX = oldXX.copy.assign(currentXX, plus)
-        val newXy = updatedState.Xy.copy.assign(currentXy, plus)
-        val newBeta = mult(inverse(newXX), newXy)
+      // Inverting the XX matrix will fail if the matrix is singular, in which case we just invert oldXX
+      val invertedXX = Try(inverse(newXX))
+      val newBeta = invertedXX match {
+        case Success(inv) => mult(inv, newXy)
+        case _ => mult(inverse(oldXX), newXy)
+      }
 
-        // compute terms for update equations
-        val delta = currentMean - oldMean
-        val term1 = ymat.copy.assign(mult(X, newBeta), minus).assign(bindArg2(pow, 2)).zSum
-        val term2 = mult(mult(oldXX, newBeta), newBeta)
-        val term3 = mult(mult(oldXX, oldBeta), oldBeta)
-        val term4 = 2 * mult(oldBeta.copy.assign(newBeta, minus), oldXy)
+      // compute terms for update equations
+      val delta = currentMean - oldMean
+      val term1 = ymat.copy.assign(mult(X, newBeta), minus).assign(bindArg2(pow, 2)).zSum
+      val term2 = mult(mult(oldXX, newBeta), newBeta)
+      val term3 = mult(mult(oldXX, oldBeta), oldBeta)
+      val term4 = 2 * mult(oldBeta.copy.assign(newBeta, minus), oldXy)
 
-        // update the all statistics of the fitted model
-        updatedState.count += currentCount
-        updatedState.mean += (delta * currentCount / (oldCount + currentCount))
-        updatedState.Xy = newXy
-        updatedState.XX = newXX
-        updatedState.beta = newBeta
-        updatedState.sumOfSquaresTotal += currentSumOfSquaresTotal +
-          delta * delta * (oldCount * currentCount) / (oldCount + currentCount)
-        updatedState.sumOfSquaresError += term1 + term2 - term3 + term4
+      // update the all statistics of the fitted model
+      updatedState.count += currentCount
+      updatedState.mean += (delta * currentCount / (oldCount + currentCount))
+      updatedState.Xy = newXy
+      updatedState.XX = newXX
+      updatedState.beta = newBeta
+      updatedState.sumOfSquaresTotal += currentSumOfSquaresTotal +
+        delta * delta * (oldCount * currentCount) / (oldCount + currentCount)
+      updatedState.sumOfSquaresError += term1 + term2 - term3 + term4
 
-        // update the ranges of the betas
-        for (i <- 0 until nBatch) {
-          updatedState.betaMins(i) = min(oldMins(i), newBeta.get(i))
-          updatedState.betaMaxes(i) = max(oldMaxes(i), newBeta.get(i))
-        }
-
-      } catch {
-        case e: Exception => {
-          println("Caught linear algebra exception: %s".format(e.toString))
-          println("oldXX: %s, newXX: %s".format(oldXX.toString, newXX.toString))
-        }
+      // update the ranges of the betas
+      for (i <- 0 until nBatch) {
+        updatedState.betaMins(i) = min(oldMins(i), newBeta.get(i))
+        updatedState.betaMaxes(i) = max(oldMaxes(i), newBeta.get(i))
       }
     }
     Some(updatedState)
