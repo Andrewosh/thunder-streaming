@@ -15,10 +15,10 @@ import org.project.thunder.streaming.util.counters.{StatCounterMixed, StatUpdate
  */
 class StatefulBinnedRegression (
     var featureKey: Int,
-    var nfeatures: Int)
+    var leftEdges: Array[Double])
   extends Serializable with Logging {
 
-  def this() = this(0, 1)
+  def this() = this(0, Array(0.0))
 
   /** Set which indices that correspond to features. */
   def setFeatureKey(featureKey: Int): StatefulBinnedRegression = {
@@ -27,8 +27,8 @@ class StatefulBinnedRegression (
   }
 
   /** Set the values associated with the to features. */
-  def setFeatureCount(nfeatures: Int): StatefulBinnedRegression = {
-    this.nfeatures = nfeatures
+  def setLeftEdges(leftEdges: Array[Double]): StatefulBinnedRegression = {
+    this.leftEdges = leftEdges
     this
   }
 
@@ -46,7 +46,7 @@ class StatefulBinnedRegression (
     }
 
     // update the stats for each key
-    data.dstream.updateStateByKey{(x, y) => StatUpdater.mixed(x, y, features, nfeatures)}
+    data.dstream.updateStateByKey{(x, y) => StatUpdater.mixed(x, y, features, leftEdges)}
 
   }
 
@@ -72,12 +72,12 @@ object StatefulBinnedRegression {
   def runToSeries(
     input: StreamingSeries,
     featureKey: Int,
-    featureCount: Int,
+    leftEdges: Int,
     featureValues: Array[Double]): StreamingSeries =
   {
     val output = new StatefulBinnedRegression()
       .setFeatureKey(featureKey)
-      .setFeatureCount(featureCount)
+      .setLeftEdges(leftEdges)
       .fit(input)
       .mapValues(x => Array(x.r2, x.weightedMean(featureValues)))
 
@@ -87,12 +87,12 @@ object StatefulBinnedRegression {
   def run(
      input: StreamingSeries,
      featureKey: Int,
-     featureCount: Int,
+     leftEdges: Array[Double],
      featureValues: Array[Double]): DStream[(Int, StatCounterMixed)] = {
 
     new StatefulBinnedRegression()
       .setFeatureKey(featureKey)
-      .setFeatureCount(featureCount)
+      .setLeftEdges(leftEdges)
       .fit(input)
   }
 }
