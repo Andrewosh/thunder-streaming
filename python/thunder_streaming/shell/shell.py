@@ -8,10 +8,10 @@ import zipfile
 import sys
 from subprocess import call
 
-from thunder.streaming.shell.feeder_configuration import *
-from thunder.streaming.shell.thunder_streaming_context import *
+from thunder_streaming.shell.feeder_configuration import *
+from thunder_streaming.shell.thunder_streaming_context import *
 
-from thunder.streaming.shell.settings import *
+from thunder_streaming.shell.settings import *
 
 def in_thunder_streaming():
     """
@@ -35,7 +35,7 @@ def find_jar(thunder_path=None):
     """
     # TODO: This regex might be too broad
     jar_regex = re.compile("^thunder-streaming.*\.jar")
-    ts_package_name = re.compile("^org\/project\/thunder\/streaming")
+    ts_package_name = re.compile("^org\/project\/thunder_streaming")
     matching_jar_names = []
     for root, dir, files in os.walk(thunder_path if thunder_path else "."):
         for file in files:
@@ -121,7 +121,6 @@ def configure_context():
 
 # The following should be executed if the script is imported as a module and also if it's launched standalone
 tssc = configure_context()
-# Import the Analysis and Output objects so that they're available from the shell
-from thunder.streaming.shell.analysis import Analysis
-from thunder.streaming.shell.output import Output
+# Import the Analysis objects so that they're available from the shell
+from thunder_streaming.shell.analysis import Analysis
 print "\nAccess the global ThunderStreamingContext through the 'tssc' object"
