@@ -269,6 +269,12 @@ class Image(Series):
             return None
         return data[plane, :, :]
 
+    @Data.transformation
+    def clip(self, data, min, max):
+        if data is None or len(data) == 0:
+            return
+        return data.clip(min, max)
+
     @Data.output
     def toLightning(self, data, image_viz, image_dims, only_viz=False):
         if data is None or len(data) == 0:
