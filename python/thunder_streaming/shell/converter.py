@@ -228,12 +228,12 @@ class Image(Series):
 
     @staticmethod
     @Data.converter
-    def toImage(analysis, dims=(512, 512, 4), clip=400, preslice=None):
+    def toImage(analysis, dims=(512, 512, 4), preslice=None):
         """
         :param analysis: The analysis whose raw output will be parsed and converted into an in-memory image
         :return: An Image object
         """
-        return Image(analysis, dims, clip, preslice)
+        return Image(analysis, dims, preslice)
 
     def _convert(self, root, new_data):
         series = Series._convert(self, root, new_data)
