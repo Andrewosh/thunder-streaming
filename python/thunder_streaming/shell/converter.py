@@ -221,10 +221,9 @@ class Image(Series):
     Represents a 2 or 3 dimensional image
     """
 
-    def __init__(self, analysis, dims, clip, preslice):
+    def __init__(self, analysis, dims, preslice):
         Series.__init__(self, analysis)
         self.dims = dims
-        self.clip = clip
         self.preslice = preslice
 
     @staticmethod
@@ -244,7 +243,7 @@ class Image(Series):
                 series = series[self.preslice]
             # Sort the keys/values
             print "series.shape: %s" % str(series.shape)
-            image_arr = series.clip(0, self.clip).reshape(self.dims)
+            image_arr = series.reshape(self.dims)
             print "_convert returning array of shape %s" % str(image_arr.shape)
             return image_arr
 
