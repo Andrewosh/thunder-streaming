@@ -258,6 +258,7 @@ class Image(Series):
 
     @Data.transformation
     def colorize(self, data, cmap="rainbow", scale=1, vmin=0, vmax=30):
+        print "In colorize, data.shape: %s" % str(data.shape)
         return Colorize(cmap=cmap, scale=scale, vmin=vmin, vmax=vmax).transform(data)
 
     @Data.transformation
