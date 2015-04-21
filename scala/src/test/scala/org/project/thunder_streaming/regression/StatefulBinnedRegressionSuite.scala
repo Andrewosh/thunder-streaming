@@ -121,23 +121,24 @@ class StatefulBinnedRegressionSuite extends FunSuite with TestSuiteBase {
   }
 
   test("r2") {
+    val featureKey = numKeys
 
-   def getR2s(output: Seq[Seq[(Int, StatCounterMixed)]]): Seq[Double] = {
-      output.last.map{ case (k, v) => v.r2 }
+    def getR2s(output: Seq[Seq[(Int, StatCounterMixed)]]): Seq[Double] = {
+      output.last.filter{ case (k,v) => k != featureKey }.map{ case (k, v) => v.r2 }
     }
 
-   def setupWithNoise(n: Double): Unit = {
+    def setupWithNoise(n: Double): Unit = {
       noise = n
-      setup()
+      setup(getModel(featureKey, leftEdges))
     }
 
     setupWithNoise(0.0)
     val perfectR2 = getR2s(output).sum
 
-    setupWithNoise(0.5)
+    setupWithNoise(2)
     val worseR2 = getR2s(output).sum
 
-    setupWithNoise(1.5)
+    setupWithNoise(4)
     val worstR2 = getR2s(output).sum
 
     println("perfectR2: %f, worseR2: %f, worstR2: %f".format(perfectR2, worseR2, worstR2))
