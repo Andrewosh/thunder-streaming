@@ -31,14 +31,14 @@ object StatUpdater {
       val grouped = pairs.groupBy{case (k,v) => k}
 
       // get data from each bin, ignoring the 0 bin and the last bin
-      val binnedData = Range(1, numBins).map{ ind => if (grouped.contains(ind)) {
+      val binnedData = Range(1, numBins + 1).map{ ind => if (grouped.contains(ind)) {
         grouped(ind).map{ case (k,v) => v}
       } else {
         Array[Double]()
       }
       }.toArray
 
-      // get all data, ignoring the 0 bin
+      // get all data, ignoring the 0 bin and the last bin
       val all = pairs.filter{case (k,v) => k != 0 && k != numBins}.map{case (k,v) => v}
 
       // update the combined stat counter
