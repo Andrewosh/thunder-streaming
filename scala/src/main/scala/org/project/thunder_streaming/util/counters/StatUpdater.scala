@@ -38,7 +38,6 @@ object StatUpdater {
       }
       }.toArray
 
-      // get all data, ignoring the 0 bin
       val all = pairs.filter{case (k,v) => k != 0 && k != numBins + 1}.map{case (k,v) => v}
 
       // update the combined stat counter
@@ -51,6 +50,4 @@ object StatUpdater {
 
     Some(updatedState)
   }
-
-
 }
