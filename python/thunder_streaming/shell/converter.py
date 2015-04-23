@@ -120,7 +120,7 @@ class Data(object):
         """
         def add_output(analysis, **kwargs):
             output_proxies = func(analysis, **kwargs)
-            if isinstance(output, list):
+            if isinstance(output_proxies, list):
                 analysis.outputs.extend(output_proxies)
             else:
                 analysis.outputs.append(output_proxies)
