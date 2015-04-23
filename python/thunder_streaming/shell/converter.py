@@ -122,9 +122,10 @@ class Data(object):
             output_proxies = func(analysis, **kwargs)
             if isinstance(output_proxies, list):
                 analysis.outputs.extend(output_proxies)
+                return [proxy.data_obj for proxy in output_proxies]
             else:
                 analysis.outputs.append(output_proxies)
-            return [proxy.data_obj for proxy in output_proxies]
+                return output_proxies.data_obj
         print "Adding %s to Analysis.__dict__" % func.func_name
         setattr(Analysis, func.func_name, add_output)
         return func
