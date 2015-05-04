@@ -6,9 +6,7 @@ import org.apache.spark.streaming.dstream.DStream
 
 import org.apache.spark.SparkContext._
 
-/**
- * Created by andrewosh on 5/4/15.
- */
+
 class StreamingTimeSeries(val dstream: DStream[(Int, (Int, Array[Double]))],
                           val interval: Duration = Seconds(3000))
   extends StreamingData[(Int, Array[Double]), StreamingTimeSeries] {
@@ -19,7 +17,9 @@ class StreamingTimeSeries(val dstream: DStream[(Int, (Int, Array[Double]))],
   }
 
   override protected def create(dstream: DStream[(Int, (Int, Array[Double]))]): StreamingTimeSeries = {
-    new StreamingTimeSeries(dstream)
+    val sts = new StreamingTimeSeries(dstream)
+    sts.dstream.checkpoint(interval)
+    sts
   }
 
   /** Print the records (useful for debugging) **/
@@ -34,20 +34,29 @@ class StreamingTimeSeries(val dstream: DStream[(Int, (Int, Array[Double]))],
    * @return a StreamingSeries instance
    */
   lazy val toStreamingSeries: StreamingSeries = {
-    new StreamingSeries(dstream.transform{
+    val ss = new StreamingSeries(dstream.transform{
       rdd => rdd.groupByKey().map{ case (k, v) => (k, v.toArray.sortBy(_._1).map(_._2).flatten) }
     })
+    ss.dstream.checkpoint(interval)
+    ss
   }
 }
 
 object StreamingTimeSeries {
 
   /**
-    Use the last key in a StreamingSeries
+    Use the first key in every record of a StreamingSeries as the batch index value in a StreamingTimeSeries
    */
   def fromStreamingSeries(series: StreamingSeries): StreamingTimeSeries = {
-
+    val sts = new StreamingTimeSeries(series.dstream.map{ case (k, v) =>
+      if (v.size == 0) {
+        (k, (0, Array[Double]()))
+      } else {
+        (k, (v(0).toInt, v.drop(1)))
+      }
+    })
+    sts.dstream.checkpoint(series.interval)
+    sts
   }
-
 }
 

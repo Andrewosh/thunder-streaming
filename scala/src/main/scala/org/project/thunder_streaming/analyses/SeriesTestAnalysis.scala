@@ -6,7 +6,7 @@ import org.apache.spark.rdd.RDD
 
 import org.project.thunder_streaming.regression.StatefulBinnedRegression
 import org.apache.spark.SparkContext._
-import org.project.thunder_streaming.rdds.StreamingSeries
+import org.project.thunder_streaming.rdds.{StreamingTimeSeries, StreamingSeries}
 import org.project.thunder_streaming.regression.{StatefulLinearRegression, StatefulBinnedRegression}
 import org.project.thunder_streaming.util.ThunderStreamingContext
 
@@ -220,6 +220,9 @@ class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
 
   def analyze(data: StreamingSeries): StreamingSeries = {
 
+    // First, make sure the data is properly ordered in time
+    val orderedData = StreamingTimeSeries.fromStreamingSeries(data).toStreamingSeries
+
     val totalSize = dims.foldLeft(1)(_ * _) + 2
     // For now, assume the regressors are the final numRegressors keys
     val featureKeys = ((totalSize - numRegressors) until totalSize).toArray
@@ -229,11 +232,11 @@ class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
 
     // For Nikita's case, convolve the behavioral variables with a difference of exponentials filter
     //val count = getSingleRecordCount(data)
-    val preprocessedData = preprocessBehaviors(data, selectedKeys)
+    val preprocessedData = preprocessBehaviors(orderedData, selectedKeys)
     //val preprocessedData = data
 
     val regressionStream = StatefulLinearRegression.run(preprocessedData, featureKeys, selectedKeys)
-    regressionStream.checkpoint(data.interval)
+    regressionStream.checkpoint(orderedData.interval)
     val outputStream = regressionStream.map{ case (k, model) => (k, (model.normalizedBetas :+ model.r2)) }
     outputStream.map{ case (k,v) => (k, v.mkString(",")) }.print()
     new StreamingSeries(outputStream)
