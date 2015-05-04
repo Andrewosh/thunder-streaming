@@ -88,6 +88,15 @@ class StatefulLinearRegression (
     val numFeatures = selectedKeys.size
     val batchNumFeatures = features.size
 
+    /*
+    if (numFeatures != batchNumFeatures) {
+      println("numFeatures: %d, batchNumFeatures: %d".format(numFeatures, batchNumFeatures))
+      println("*******************")
+      features.foreach(f => println(f.mkString(",").take(2)))
+      println("****************************")
+    }
+    */
+
     // Include the intercept term
     val n = numFeatures + 1
     val nBatch = batchNumFeatures + 1
@@ -105,6 +114,8 @@ class StatefulLinearRegression (
       for (i <- 0 until currentCount) {
         X.set(i, 0, 1)
       }
+
+      //println("currentCount: %d, nBatch: %d".format(currentCount, nBatch))
       for (i <- 0 until currentCount ; j <- 1 until nBatch) {
         X.set(i, j, features(j - 1)(i))
       }
@@ -134,11 +145,11 @@ class StatefulLinearRegression (
       val newXX = oldXX.copy.assign(currentXX, plus)
       val newXy = updatedState.Xy.copy.assign(currentXy, plus)
 
-      // Inverting the XX matrix will fail if the matrix is singular, in which case we just invert oldXX
+      // Inverting the XX matrix will fail if the matrix is singular, in which just return oldBeta
       val invertedXX = Try(inverse(newXX))
       val newBeta = invertedXX match {
         case Success(inv) => mult(inv, newXy)
-        case _ => mult(inverse(oldXX), newXy)
+        case _ => oldBeta
       }
 
       // compute terms for update equations
@@ -172,11 +183,14 @@ class StatefulLinearRegression (
     var features = Array[Array[Double]]()
 
     data.dstream.filter{case (k, _) => selectedKeys.contains(k)}.foreachRDD{rdd =>
-        val batchFeatures = rdd.values.collect()
+        println("RDD contains keys: %s".format(rdd.keys.collect().mkString(",")))
+        val batchFeatures = rdd.groupByKey().values.collect().map(_.flatten.toArray)
         features = batchFeatures.size match {
           case 0 => Array[Array[Double]]()
           case _ => batchFeatures
         }
+        println("After groupByKey, features.size: %d".format(features.size))
+        println("features lengths: %s".format(features.map(_.size).mkString(",")))
     }
 
     data.dstream.filter{case (k, _) => !featureKeys.contains(k)}.updateStateByKey{

@@ -47,3 +47,6 @@ resolvers ++= Seq(
 resolvers += "Sonatype (releases)" at "https://oss.sonatype.org/content/repositories/releases/"
 
 libraryDependencies += "org.zeromq" % "jeromq" % "0.3.4"
+
+// or 2.11.5
+scalaVersion := "2.10.4"

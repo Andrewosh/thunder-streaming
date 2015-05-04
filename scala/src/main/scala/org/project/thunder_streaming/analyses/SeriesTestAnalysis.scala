@@ -1,5 +1,7 @@
 package org.project.thunder_streaming.analyses
 
+import breeze.linalg.DenseVector
+import org.apache.commons.collections.buffer.CircularFifoBuffer
 import org.apache.spark.rdd.RDD
 
 import org.project.thunder_streaming.regression.StatefulBinnedRegression
@@ -10,6 +12,12 @@ import org.project.thunder_streaming.util.ThunderStreamingContext
 
 import spray.json._
 import DefaultJsonProtocol._
+
+import breeze.signal._
+import breeze.linalg._
+import breeze.numerics._
+
+import collection.JavaConversions._
 
 abstract class SeriesTestAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
   extends Analysis[StreamingSeries](tssc, params) {
@@ -136,23 +144,99 @@ class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
   val numRegressors = params.getSingleParam("num_regressors").parseJson.convertTo[Int]
   val selected = params.getSingleParam("selected").parseJson.convertTo[Set[Int]]
 
+  var regressors: Map[Int, CircularFifoBuffer] = _
+
+  val tau = 3.0
+  val tau1 = 1.0
+  val windowSize = 50
+
+  val doubleExpFilter: DenseVector[Double] = {
+    val x = linspace(0, windowSize, windowSize)
+    val ker = DenseVector.vertcat(DenseVector.zeros[Double](windowSize - 1), (exp(-x/tau) - exp(-x/tau1)))
+    ker / sum(ker)
+  }
+
+  /**
+   * Do any preprocessing of the regressors here, and return a StreamingSeries with those keys
+   * having been modified.
+   */
+  def preprocessBehaviors(data: StreamingSeries, keys: Array[Int]): StreamingSeries = {
+    val keySet = keys.toSet[Int]
+    regressors = keys.map{ k => (k -> new CircularFifoBuffer(Array.fill(windowSize*3)(0.0).toList)) }.toMap
+
+    /*
+    // Insert new data into each of the regressor buffers
+    data.filterOnKeys(k => keySet.contains(k)).dstream.foreachRDD{
+      rdd => rdd.collect().foreach {
+        case (k, v) =>  putRegressor(k, v)
+      }
+    }
+    */
+
+    def putRegressor(key: Int, value: Array[Double]) = {
+      regressors.get(key) match { case Some(buf) => value.map(buf.add(_)) }
+    }
+
+    def getRegressor(key: Int): Array[Double] = {
+      regressors(key).toArray.map(x => x.asInstanceOf[Double])
+    }
+
+    // Insert the modified regressors into the original data stream before the regression
+    data.apply { case (key, value) =>
+          // Update the regressors, then return a new StreamSeries with those modified regressors
+      if (keySet.contains(key) && (regressors != null)) {
+          if (key == keys(0)) {
+            val forward = value.map(x => x / 10000.0 - 3.0)
+            (key, forward)
+          } else if (key == keys(1)) {
+            val backward = value.map(x => x / 10000.0 - 3.0)
+            (key, backward)
+          } else if (key == keys(2)) {
+            val state = getRegressor(key)
+            val behavior = value.map(x => x / 10000.0 - 1.0)
+            val behavVector = DenseVector.vertcat(new DenseVector(state) ,new DenseVector(behavior))
+            // Convolve the behavior with the difference of exponentials filter
+            val convolved = convolve(behavVector, doubleExpFilter, overhang = OptOverhang.PreserveLength)
+                                .toArray.drop(state.size)
+            // Store the resulting convolution as the new state
+            putRegressor(key, convolved)
+            println("convolved: %s".format(convolved.mkString(",")))
+            (key, convolved)
+          } else {
+            (key, value)
+          }
+      } else {
+        (key, value)
+      }
+    }
+  }
+
+  /*
+  def getSingleRecordCount(data: StreamingSeries): Int = {
+    // Just use the 0 key
+    data.filterOnKeys(k => k == 0).dstream.map{ case (k, v) => v.size }.reduce(_+_)
+  }
+  */
+
   def analyze(data: StreamingSeries): StreamingSeries = {
 
     val totalSize = dims.foldLeft(1)(_ * _) + 2
     // For now, assume the regressors are the final numRegressors keys
-    val featureKeys = ((totalSize - numRegressors) to (totalSize - 1)).toArray
+    val featureKeys = ((totalSize - numRegressors) until totalSize).toArray
     val startIdx = totalSize - numRegressors
-    val selectedKeys = featureKeys.zipWithIndex.filter{ case (f, idx) => selected.contains(idx) }.map(_._1)
+    val selectedKeys = featureKeys.zipWithIndex.filter{ case (f, idx) => selected.contains(idx)}.map(_._1)
     println("selectedKeys: %s, featureKeys: %s".format(selectedKeys.mkString(","), featureKeys.mkString(",")))
-    val regressionStream = StatefulLinearRegression.run(data, featureKeys, selectedKeys)
+
+    // For Nikita's case, convolve the behavioral variables with a difference of exponentials filter
+    //val count = getSingleRecordCount(data)
+    val preprocessedData = preprocessBehaviors(data, selectedKeys)
+    //val preprocessedData = data
+
+    val regressionStream = StatefulLinearRegression.run(preprocessedData, featureKeys, selectedKeys)
     regressionStream.checkpoint(data.interval)
-    // For up to 2 regressors, convert betas and r2 into a color map (by using the betas as RGB weights and R2 as alpha)
-    // TODO: This should be turned into some sort of a colorize function
-    val rgbStream = regressionStream.map{ case (k, model) => {
-      (k, (model.normalizedBetas :+ model.r2).map(d => d * 255.0))
-    }}
-    rgbStream.map{ case (k,v) => (k, v.mkString(",")) }.print()
-    new StreamingSeries(rgbStream)
+    val outputStream = regressionStream.map{ case (k, model) => (k, (model.normalizedBetas :+ model.r2)) }
+    outputStream.map{ case (k,v) => (k, v.mkString(",")) }.print()
+    new StreamingSeries(outputStream)
   }
 }
 
@@ -168,7 +252,7 @@ class SeriesBinnedRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
 
     val totalSize = dims.foldLeft(1)(_ * _) + 2
     // For now, assume the regressors are the final numRegressors keys
-    val featureKeys = ((totalSize - numRegressors) to (totalSize - 1)).toArray
+    val featureKeys = ((totalSize - numRegressors) until totalSize).toArray
     val startIdx = totalSize - numRegressors
     val selectedKeys = featureKeys.zipWithIndex.filter{ case (f, idx) => selected == idx }.map(_._1)
     val selectedKey = selectedKeys(0)
