@@ -4,7 +4,7 @@
 import numpy as np
 
 
-def transpose_files(filenames, outfp, dtype='uint16'):
+def transpose_files(filenames, outfp, batch_num, dtype='uint16'):
     """Rewrites the flat binary files whose names are given in 'filenames' into a single flat binary
     output file.
 
@@ -21,9 +21,13 @@ def transpose_files(filenames, outfp, dtype='uint16'):
         ary = np.fromfile(fn, dtype=dtype)
         if outbuf is None:
             ary_size = ary.size
-            totsize = ary_size * nfiles
+            # One additional row for the time index
+            totsize = ary_size * nfiles + nfiles
             outbuf = np.empty((totsize,), dtype=dtype)
         outbuf[fnidx::nfiles] = ary
+    # Include one additional row for the batch number (zero padded to match the length of the other records)
+    outbuf[-nfiles:] = np.zeros((nfiles,))
+    outbuf[-nfiles] = batch_num
     if outbuf is not None:
         outbuf.tofile(outfp)
     return ary_size  # number of distinct indices written
