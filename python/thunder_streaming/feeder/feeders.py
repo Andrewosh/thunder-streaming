@@ -377,7 +377,8 @@ class SyncSeriesFeeder(SyncCopyAndMoveFeeder):
                                                                       startlinidx=nindices_written)
                 tmpfp.close()
 
-                record_vals_size = ninput_files * np.dtype(self.dtype).itemsize
+                # ninput_files + 1 because of the batch number index
+                record_vals_size = (ninput_files + 1) * np.dtype(self.dtype).itemsize
                 if self.linear:
                     recordsize = np.dtype(self.dtype).itemsize + record_vals_size
                 elif self.shape:

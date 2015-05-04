@@ -15,22 +15,22 @@ def transpose_files(filenames, outfp, batch_num, dtype='uint16'):
     This corresponds to a Thunder binary series file, except without keys.
     """
     outbuf = None
-    nfiles = len(filenames)
+    incr = len(filenames) + 1
     ary_size = 0
+
     for fnidx, fn in enumerate(filenames):
         ary = np.fromfile(fn, dtype=dtype)
         if outbuf is None:
             ary_size = ary.size
             # One additional row for the time index
-            totsize = ary_size * nfiles + nfiles
+            totsize = ary_size * incr
             outbuf = np.empty((totsize,), dtype=dtype)
-        outbuf[fnidx:totsize-nfiles:nfiles] = ary
-    # Include one additional row for the batch number (zero padded to match the length of the other records)
-    outbuf[-nfiles:] = np.zeros((nfiles,))
-    outbuf[-nfiles] = batch_num
+            # Include one column in each record for the batch number
+            outbuf[0::incr] = batch_num
+        outbuf[fnidx+1::incr] = ary
     if outbuf is not None:
         outbuf.tofile(outfp)
-    return ary_size + 1  # number of distinct indices written + the time index
+    return ary_size # number of distinct indices written + the time index
 
 
 def _write_series_records(filenames, ndim=1, dtype='uint16', indtype='uint16'):
