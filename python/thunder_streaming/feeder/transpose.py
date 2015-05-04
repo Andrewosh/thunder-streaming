@@ -24,13 +24,13 @@ def transpose_files(filenames, outfp, batch_num, dtype='uint16'):
             # One additional row for the time index
             totsize = ary_size * nfiles + nfiles
             outbuf = np.empty((totsize,), dtype=dtype)
-        outbuf[fnidx::nfiles] = ary
+        outbuf[fnidx:totsize-nfiles:nfiles] = ary
     # Include one additional row for the batch number (zero padded to match the length of the other records)
     outbuf[-nfiles:] = np.zeros((nfiles,))
     outbuf[-nfiles] = batch_num
     if outbuf is not None:
         outbuf.tofile(outfp)
-    return ary_size  # number of distinct indices written
+    return ary_size + 1  # number of distinct indices written + the time index
 
 
 def _write_series_records(filenames, ndim=1, dtype='uint16', indtype='uint16'):
