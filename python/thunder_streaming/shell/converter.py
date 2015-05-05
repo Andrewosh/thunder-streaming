@@ -346,7 +346,7 @@ class Image(Series):
 
     @Data.transformation
     def maxProject(self, data, axis=0):
-        return max(data, axis=axis)
+        return max(data, axis=axis, keepdims=True)
 
     @Data.output
     def toLightning(self, data, image_viz, image_dims, only_viz=False):
