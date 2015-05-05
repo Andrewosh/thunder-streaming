@@ -4,7 +4,7 @@ from abc import abstractmethod
 from collections import OrderedDict
 from thunder import Colorize
 import numpy as np
-from numpy import cumprod
+from numpy import cumprod, max
 from scipy.signal import decimate
 from math import ceil
 import re
@@ -343,6 +343,10 @@ class Image(Series):
         if data is None or len(data) == 0:
             return
         return data.clip(min, max)
+
+    @Data.transformation
+    def maxProject(self, data, axis=0):
+        return max(data, axis=axis)
 
     @Data.output
     def toLightning(self, data, image_viz, image_dims, only_viz=False):
