@@ -184,7 +184,7 @@ class StatefulLinearRegression (
 
     data.dstream.filter{case (k, _) => selectedKeys.contains(k)}.foreachRDD{rdd =>
         println("RDD contains keys: %s".format(rdd.keys.collect().mkString(",")))
-        val batchFeatures = rdd.groupByKey().values.collect().map(_.flatten.toArray)
+        val batchFeatures = rdd.values.collect()
         features = batchFeatures.size match {
           case 0 => Array[Array[Double]]()
           case _ => batchFeatures

@@ -200,7 +200,6 @@ class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
                                 .toArray.drop(state.size)
             // Store the resulting convolution as the new state
             putRegressor(key, convolved)
-            println("convolved: %s".format(convolved.mkString(",")))
             (key, convolved)
           } else {
             (key, value)

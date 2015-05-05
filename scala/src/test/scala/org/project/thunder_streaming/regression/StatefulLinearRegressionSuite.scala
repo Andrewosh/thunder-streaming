@@ -14,7 +14,7 @@ import TestUtils._
 
 abstract class LinearRegressionSuite extends FunSuite with TestSuiteBase {
 
-  override def maxWaitTimeMillis = 5000
+  override def maxWaitTimeMillis = 10000
 
   var numBatches = 20
   var numPoints = 10
