@@ -156,12 +156,44 @@ class SeriesFiltering2Analysis(tssc: ThunderStreamingContext, params: AnalysisPa
   }
 }
 
+
+abstract class SeriesRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
+  extends SeriesTestAnalysis(tssc, params) {
+
+  val numRegressors = params.getSingleParam("num_regressors").toInt
+  val selected = params.getSingleParam("selected").parseJson.convertTo[Set[Int]]
+  val dims = params.getSingleParam("dims").parseJson.convertTo[List[Int]]
+
+  var featureKeys: Array[Int] = _
+  var selectedKeys: Array[Int] = _
+
+  def analyze(data: StreamingSeries): StreamingSeries = {
+    val totalSize = dims.foldLeft(1)(_ * _) + 2
+    // For now, assume the regressors are the final numRegressors keys
+    featureKeys = ((totalSize - numRegressors) until totalSize).toArray
+    val startIdx = totalSize - numRegressors
+    selectedKeys = featureKeys.zipWithIndex.filter { case (f, idx) => selected.contains(idx) }.map(_._1)
+    data
+  }
+
+}
+
+
+class SeriesExtractRegressorsAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
+    extends SeriesRegressionAnalysis(tssc, params) {
+
+  def analyze(data: StreamingSeries): StreamingSeries = {
+    val data = super.analyze(data)
+    val keySet = featureKeys.toSet[Int]
+    data.filterOnKeys(keySet.contains(_))
+  }
+}
+
+
 class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
-    extends SeriesTestAnalysis(tssc, params) {
+    extends SeriesRegressionAnalysis(tssc, params) {
 
   val dims = params.getSingleParam("dims").parseJson.convertTo[List[Int]]
-  val numRegressors = params.getSingleParam("num_regressors").parseJson.convertTo[Int]
-  val selected = params.getSingleParam("selected").parseJson.convertTo[Set[Int]]
 
   var regressors: Map[Int, CircularFifoBuffer] = _
 
@@ -175,6 +207,14 @@ class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
     ker / sum(ker)
   }
 
+  def putRegressor(key: Int, value: Array[Double]) = {
+    regressors.get(key) match { case Some(buf) => value.map(buf.add(_)) }
+  }
+
+  def getRegressor(key: Int): Array[Double] = {
+    regressors(key).toArray.map(x => x.asInstanceOf[Double])
+  }
+
   /**
    * Do any preprocessing of the regressors here, and return a StreamingSeries with those keys
    * having been modified.
@@ -183,70 +223,40 @@ class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
     val keySet = keys.toSet[Int]
     regressors = keys.map{ k => (k -> new CircularFifoBuffer(Array.fill(windowSize*3)(0.0).toList)) }.toMap
 
-    /*
-    // Insert new data into each of the regressor buffers
-    data.filterOnKeys(k => keySet.contains(k)).dstream.foreachRDD{
-      rdd => rdd.collect().foreach {
-        case (k, v) =>  putRegressor(k, v)
-      }
-    }
-    */
-
-    def putRegressor(key: Int, value: Array[Double]) = {
-      regressors.get(key) match { case Some(buf) => value.map(buf.add(_)) }
-    }
-
-    def getRegressor(key: Int): Array[Double] = {
-      regressors(key).toArray.map(x => x.asInstanceOf[Double])
-    }
-
     // Insert the modified regressors into the original data stream before the regression
     data.apply { case (key, value) =>
           // Update the regressors, then return a new StreamSeries with those modified regressors
       if (keySet.contains(key) && (regressors != null)) {
-          if (key == keys(0)) {
-            val forward = value.map(x => x / 10000.0 - 3.0)
-            (key, forward)
-          } else if (key == keys(1)) {
-            val backward = value.map(x => x / 10000.0 - 3.0)
-            (key, backward)
-          } else if (key == keys(2)) {
-            val state = getRegressor(key)
-            val behavior = value.map(x => x / 10000.0 - 1.0)
-            val behavVector = DenseVector.vertcat(new DenseVector(state) ,new DenseVector(behavior))
-            // Convolve the behavior with the difference of exponentials filter
-            val convolved = convolve(behavVector, doubleExpFilter, overhang = OptOverhang.PreserveLength)
-                                .toArray.drop(state.size)
-            // Store the resulting convolution as the new state
-            putRegressor(key, convolved)
-            (key, convolved)
-          } else {
-            (key, value)
-          }
+        if (key == keys(0)) {
+          val forward = value.map(x => x / 10000.0 - 3.0)
+          (key, forward)
+        } else if (key == keys(1)) {
+          val backward = value.map(x => x / 10000.0 - 3.0)
+          (key, backward)
+        } else if (key == keys(2)) {
+          val state = getRegressor(key)
+          val behavior = value.map(x => x / 10000.0 - 1.0)
+          val behavVector = DenseVector.vertcat(new DenseVector(state) ,new DenseVector(behavior))
+          // Convolve the behavior with the difference of exponentials filter
+          val convolved = convolve(behavVector, doubleExpFilter, overhang = OptOverhang.PreserveLength)
+                              .toArray.drop(state.size)
+          // Store the resulting convolution as the new state
+          putRegressor(key, convolved)
+          (key, convolved)
+        } else {
+          (key, value)
+        }
       } else {
         (key, value)
       }
     }
   }
 
-  /*
-  def getSingleRecordCount(data: StreamingSeries): Int = {
-    // Just use the 0 key
-    data.filterOnKeys(k => k == 0).dstream.map{ case (k, v) => v.size }.reduce(_+_)
-  }
-  */
-
-  def analyze(data: StreamingSeries): StreamingSeries = {
+  override def analyze(data: StreamingSeries): StreamingSeries = {
+    val data = super.analyze(data)
 
     // First, make sure the data is properly ordered in time
     val orderedData = StreamingTimeSeries.fromStreamingSeries(data).toStreamingSeries
-
-    val totalSize = dims.foldLeft(1)(_ * _) + 2
-    // For now, assume the regressors are the final numRegressors keys
-    val featureKeys = ((totalSize - numRegressors) until totalSize).toArray
-    val startIdx = totalSize - numRegressors
-    val selectedKeys = featureKeys.zipWithIndex.filter{ case (f, idx) => selected.contains(idx)}.map(_._1)
-    println("selectedKeys: %s, featureKeys: %s".format(selectedKeys.mkString(","), featureKeys.mkString(",")))
 
     // For Nikita's case, convolve the behavioral variables with a difference of exponentials filter
     //val count = getSingleRecordCount(data)
@@ -261,21 +271,15 @@ class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
   }
 }
 
+
 class SeriesBinnedRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
-  extends SeriesTestAnalysis(tssc, params) {
+  extends SeriesRegressionAnalysis(tssc, params) {
 
-  val dims = params.getSingleParam("dims").parseJson.convertTo[Array[Int]]
   val edges = params.getSingleParam("edges").parseJson.convertTo[Array[Double]]
-  val numRegressors = params.getSingleParam("num_regressors").parseJson.convertTo[Int]
-  val selected = params.getSingleParam("selected").parseJson.convertTo[Int]
 
-  def analyze(data: StreamingSeries): StreamingSeries = {
+  override def analyze(data: StreamingSeries): StreamingSeries = {
+    val data = super.analyze(data)
 
-    val totalSize = dims.foldLeft(1)(_ * _) + 2
-    // For now, assume the regressors are the final numRegressors keys
-    val featureKeys = ((totalSize - numRegressors) until totalSize).toArray
-    val startIdx = totalSize - numRegressors
-    val selectedKeys = featureKeys.zipWithIndex.filter{ case (f, idx) => selected == idx }.map(_._1)
     val selectedKey = selectedKeys(0)
 
     val regressionStream = StatefulBinnedRegression.run(data, selectedKey, edges)
@@ -286,6 +290,7 @@ class SeriesBinnedRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
     new StreamingSeries(statsMap)
   }
 }
+
 
 /*
 class SeriesFilteringRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
