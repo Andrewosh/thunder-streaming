@@ -24,7 +24,9 @@ abstract class SeriesTestAnalysis(tssc: ThunderStreamingContext, params: Analysi
 
   def load(path: String): StreamingSeries = {
     val format = params.getSingleParam(SeriesTestAnalysis.FORMAT_KEY)
-    tssc.loadStreamingSeries(path, inputFormat = format)
+    // Check if the StreamingSeries has already been loaded. If so, use the existing object. If not,
+    // load the series from the path
+    SeriesTestAnalysis.load(tssc, path, format)
   }
 
   override def run(data: StreamingSeries): StreamingSeries = {
@@ -38,6 +40,23 @@ abstract class SeriesTestAnalysis(tssc: ThunderStreamingContext, params: Analysi
 object SeriesTestAnalysis {
   final val DATA_PATH_KEY = "data_path"
   final val FORMAT_KEY = "format"
+
+  var loaded = Map[String, StreamingSeries]()
+
+  /**
+    This static load method ensures that all SeriesTestAnalysis classes that load a StreamingSeries
+    object from the same path will share the same StreamingSeries in memory (to prevent each Analysis
+    from loading their inputs independently).
+  **/
+  def load(tssc: ThunderStreamingContext, path: String, format: String): StreamingSeries = {
+    val maybeExisting = loaded.get(path)
+    val loadedSeries = maybeExisting match {
+      case Some(series) => series
+      case _ => tssc.loadStreamingSeries(path, inputFormat = format)
+    }
+    loaded = loaded + (path ->loadedSeries)
+    loadedSeries
+  }
 }
 
 class SeriesMeanAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
