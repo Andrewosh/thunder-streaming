@@ -12,6 +12,7 @@ import os
 import json
 import struct
 import time
+from tifffile import imsave
 
 # TODO Fix up comment
 """
@@ -267,7 +268,10 @@ class Series(Data):
         if path:
             fullPath = path if not prefix else path + '-' + str(time.time())
             fullPath = fullPath + '.' + fileType
-            self._saveBinaryToPath(fullPath, data)
+            if fileType == 'bin':
+                self._saveBinaryToPath(fullPath, data)
+            elif fileType == 'tif':
+                imsave(fullPath, data)
         else:
             print "Path not specified in toFile."
 
