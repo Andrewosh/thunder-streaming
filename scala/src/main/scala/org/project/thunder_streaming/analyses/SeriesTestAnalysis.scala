@@ -236,7 +236,7 @@ class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
 
     val regressionStream = StatefulLinearRegression.run(preprocessedData, featureKeys, selectedKeys)
     regressionStream.checkpoint(orderedData.interval)
-    val outputStream = regressionStream.map{ case (k, model) => (k, (model.normalizedBetas :+ model.r2)) }
+    val outputStream = regressionStream.map{ case (k, model) => (k, (model.r2 +: model.normalizedBetas)) }
     outputStream.map{ case (k,v) => (k, v.mkString(",")) }.print()
     new StreamingSeries(outputStream)
   }
