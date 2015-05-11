@@ -182,8 +182,8 @@ abstract class SeriesRegressionAnalysis(tssc: ThunderStreamingContext, params: A
 class SeriesExtractRegressorsAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
     extends SeriesRegressionAnalysis(tssc, params) {
 
-  def analyze(data: StreamingSeries): StreamingSeries = {
-    val data = super.analyze(data)
+  override def analyze(data: StreamingSeries): StreamingSeries = {
+    super.analyze(data)
     val keySet = featureKeys.toSet[Int]
     data.filterOnKeys(keySet.contains(_))
   }
@@ -192,8 +192,6 @@ class SeriesExtractRegressorsAnalysis(tssc: ThunderStreamingContext, params: Ana
 
 class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
     extends SeriesRegressionAnalysis(tssc, params) {
-
-  val dims = params.getSingleParam("dims").parseJson.convertTo[List[Int]]
 
   var regressors: Map[Int, CircularFifoBuffer] = _
 
@@ -253,7 +251,7 @@ class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
   }
 
   override def analyze(data: StreamingSeries): StreamingSeries = {
-    val data = super.analyze(data)
+    super.analyze(data)
 
     // First, make sure the data is properly ordered in time
     val orderedData = StreamingTimeSeries.fromStreamingSeries(data).toStreamingSeries
@@ -278,7 +276,7 @@ class SeriesBinnedRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
   val edges = params.getSingleParam("edges").parseJson.convertTo[Array[Double]]
 
   override def analyze(data: StreamingSeries): StreamingSeries = {
-    val data = super.analyze(data)
+    super.analyze(data)
 
     val selectedKey = selectedKeys(0)
 
