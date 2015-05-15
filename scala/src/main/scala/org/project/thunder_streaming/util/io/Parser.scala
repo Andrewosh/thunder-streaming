@@ -1,6 +1,6 @@
 package org.project.thunder_streaming.util.io
 
-import java.nio.{ByteBuffer, ByteOrder}
+import java.nio.{IntBuffer, ByteBuffer, ByteOrder}
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.linalg.Vectors
 
@@ -11,7 +11,7 @@ import org.apache.spark.mllib.linalg.Vectors
  *
  * @param format Byte encoding
  */
-case class Parser(format: String = "short") {
+case class Parser(format: String = "u_short") {
 
   /**
    * Convert an Array[Byte] to Array[Double]
@@ -22,6 +22,17 @@ case class Parser(format: String = "short") {
   def convertBytes(v: Array[Byte]): Array[Double] = {
 
     format match {
+      // Not doing anything fancy here because it needs to be a fast path
+      case "u_short" => {
+        val buffer = ByteBuffer.wrap(v).order(ByteOrder.LITTLE_ENDIAN).asCharBuffer()
+        val intArray = new Array[Int](buffer.remaining())
+        var t = 0
+        while (buffer.remaining() > 0) {
+          intArray(t) = buffer.get()
+          t += 1
+        }
+        intArray.map(_.toDouble)
+      }
       case "short" => {
         val buffer = ByteBuffer.wrap(v).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
         val intArray = new Array[Int](buffer.remaining())
@@ -44,13 +55,13 @@ case class Parser(format: String = "short") {
       }
       case "double" => {
         val buffer = ByteBuffer.wrap(v).order(ByteOrder.LITTLE_ENDIAN).asDoubleBuffer()
-        val DoubleArray = new Array[Double](buffer.remaining())
+        val doubleArray = new Array[Double](buffer.remaining())
         var t = 0
         while (buffer.remaining() > 0) {
-          DoubleArray(t) = buffer.get()
+          doubleArray(t) = buffer.get()
           t += 1
         }
-        DoubleArray
+        doubleArray
       }
     }
   }

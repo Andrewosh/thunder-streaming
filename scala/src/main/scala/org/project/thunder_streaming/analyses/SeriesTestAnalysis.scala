@@ -37,6 +37,24 @@ abstract class SeriesTestAnalysis(tssc: ThunderStreamingContext, params: Analysi
 
 }
 
+abstract class TimeSeriesTestAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
+  extends Analysis[StreamingSeries](tssc, params) {
+
+  def load(path: String): StreamingSeries = {
+    val format = params.getSingleParam(SeriesTestAnalysis.FORMAT_KEY)
+    // Check if the StreamingSeries has already been loaded. If so, use the existing object. If not,
+    // load the series from the path
+    TimeSeriesTestAnalysis.load(tssc, path, format)
+  }
+
+  override def run(data: StreamingSeries): StreamingSeries = {
+    analyze(data)
+  }
+
+  def analyze(data: StreamingSeries): StreamingSeries
+
+}
+
 object SeriesTestAnalysis {
   final val DATA_PATH_KEY = "data_path"
   final val FORMAT_KEY = "format"
@@ -50,13 +68,42 @@ object SeriesTestAnalysis {
   **/
   def load(tssc: ThunderStreamingContext, path: String, format: String): StreamingSeries = {
     val maybeExisting = loaded.get(path)
-    val loadedSeries = maybeExisting match {
+    maybeExisting match {
       case Some(series) => series
-      case _ => tssc.loadStreamingSeries(path, inputFormat = format)
+      case _ => {
+        val series = tssc.loadStreamingSeries(path, inputFormat = format)
+        loaded = loaded + (path -> series)
+        series
+      }
     }
-    loaded = loaded + (path ->loadedSeries)
-    loadedSeries
   }
+
+}
+
+object TimeSeriesTestAnalysis {
+  final val DATA_PATH_KEY = "data_path"
+  final val FORMAT_KEY = "format"
+
+  var loaded = Map[String, StreamingSeries]()
+
+  /**
+    This static load method ensures that all SeriesTestAnalysis classes that load a StreamingSeries
+    object from the same path will share the same StreamingSeries in memory (to prevent each Analysis
+    from loading their inputs independently).
+  **/
+  def load(tssc: ThunderStreamingContext, path: String, format: String): StreamingSeries = {
+    val maybeExisting = loaded.get(path)
+    maybeExisting match {
+      case Some(series) => series
+      case _ => {
+        val unorderedSeries = tssc.loadStreamingSeries(path, inputFormat = format)
+        val orderedSeries = StreamingTimeSeries.fromStreamingSeries(unorderedSeries).toStreamingSeries
+        loaded = loaded + (path -> orderedSeries)
+        orderedSeries
+      }
+    }
+  }
+
 }
 
 class SeriesMeanAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
@@ -158,7 +205,7 @@ class SeriesFiltering2Analysis(tssc: ThunderStreamingContext, params: AnalysisPa
 
 
 abstract class SeriesRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
-  extends SeriesTestAnalysis(tssc, params) {
+  extends TimeSeriesTestAnalysis(tssc, params) {
 
   val numRegressors = params.getSingleParam("num_regressors").toInt
   val selected = params.getSingleParam("selected").parseJson.convertTo[Set[Int]]
@@ -168,32 +215,20 @@ abstract class SeriesRegressionAnalysis(tssc: ThunderStreamingContext, params: A
   var selectedKeys: Array[Int] = _
 
   def analyze(data: StreamingSeries): StreamingSeries = {
-    val totalSize = dims.foldLeft(1)(_ * _) + 2
+    val totalSize = dims.foldLeft(1)(_ * _) + numRegressors
     // For now, assume the regressors are the final numRegressors keys
     featureKeys = ((totalSize - numRegressors) until totalSize).toArray
-    val startIdx = totalSize - numRegressors
     selectedKeys = featureKeys.zipWithIndex.filter { case (f, idx) => selected.contains(idx) }.map(_._1)
+    println("featureKeys: %s, selectedKeys: %s".format(featureKeys.mkString(","), selectedKeys.mkString(",")))
     data
   }
 
 }
 
-
-class SeriesExtractRegressorsAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
-    extends SeriesRegressionAnalysis(tssc, params) {
-
-  override def analyze(data: StreamingSeries): StreamingSeries = {
-    super.analyze(data)
-    val keySet = featureKeys.toSet[Int]
-    data.filterOnKeys(keySet.contains(_))
-  }
-}
-
-
-class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
-    extends SeriesRegressionAnalysis(tssc, params) {
-
-  var regressors: Map[Int, CircularFifoBuffer] = _
+/**
+ * TODO This needs to not be like this
+ */
+trait NikitaPreprocessing {
 
   val tau = 3.0
   val tau1 = 1.0
@@ -201,16 +236,8 @@ class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
 
   val doubleExpFilter: DenseVector[Double] = {
     val x = linspace(0, windowSize, windowSize)
-    val ker = DenseVector.vertcat(DenseVector.zeros[Double](windowSize - 1), (exp(-x/tau) - exp(-x/tau1)))
+    val ker = DenseVector.vertcat(new DenseVector(Array.fill(windowSize - 1)(0.0)), exp(-x/tau) - exp(-x/tau1))
     ker / sum(ker)
-  }
-
-  def putRegressor(key: Int, value: Array[Double]) = {
-    regressors.get(key) match { case Some(buf) => value.map(buf.add(_)) }
-  }
-
-  def getRegressor(key: Int): Array[Double] = {
-    regressors(key).toArray.map(x => x.asInstanceOf[Double])
   }
 
   /**
@@ -219,7 +246,26 @@ class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
    */
   def preprocessBehaviors(data: StreamingSeries, keys: Array[Int]): StreamingSeries = {
     val keySet = keys.toSet[Int]
-    regressors = keys.map{ k => (k -> new CircularFifoBuffer(Array.fill(windowSize*3)(0.0).toList)) }.toMap
+
+    var regressors = keys.map{ k => (k -> Array[Double]()) }.toMap
+
+    def getRegressor(key: Int): Array[Double] = {
+      regressors(key)
+    }
+
+    data.dstream.filter{case (k, _) => keySet.contains(k)}.foreachRDD{rdd =>
+      val batchRegressors = rdd.collect().map{ case (key, value) =>
+       val updatedState = regressors.get(key) match {
+         case Some(arr) => {
+           val appended = value ++: arr
+           (key -> appended.take(min(windowSize, appended.size)))
+         }
+       }
+      updatedState}.toMap
+      if (batchRegressors.size == keys.size) {
+        regressors = batchRegressors
+      }
+    }
 
     // Insert the modified regressors into the original data stream before the regression
     data.apply { case (key, value) =>
@@ -227,20 +273,23 @@ class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
       if (keySet.contains(key) && (regressors != null)) {
         if (key == keys(0)) {
           val forward = value.map(x => x / 10000.0 - 3.0)
+          println("Forward, %s -> %s".format(value.mkString(","), forward.mkString(",")))
           (key, forward)
         } else if (key == keys(1)) {
           val backward = value.map(x => x / 10000.0 - 3.0)
+          println("Backward, %s -> %s".format(value.mkString(","), backward.mkString(",")))
           (key, backward)
         } else if (key == keys(2)) {
-          val state = getRegressor(key)
-          val behavior = value.map(x => x / 10000.0 - 1.0)
-          val behavVector = DenseVector.vertcat(new DenseVector(state) ,new DenseVector(behavior))
+          val behavior = getRegressor(key).map(x => x / 10000.0 - 1.0)
+          println("behavior: %s".format(behavior.mkString(",")))
+          val behavVector = new DenseVector[Double](behavior)
           // Convolve the behavior with the difference of exponentials filter
-          val convolved = convolve(behavVector, doubleExpFilter, overhang = OptOverhang.PreserveLength)
-                              .toArray.drop(state.size)
+          val convolved = convolve(behavVector, doubleExpFilter, overhang = OptOverhang.PreserveLength).toArray
+          val withoutState = convolved.drop(behavior.size - value.size)
           // Store the resulting convolution as the new state
-          putRegressor(key, convolved)
-          (key, convolved)
+          println("Behavior, %s -> %s".format(behavior.mkString(","), convolved.mkString(",")))
+          println("withoutState: %s".format(withoutState.mkString(",")))
+          (key, withoutState)
         } else {
           (key, value)
         }
@@ -249,21 +298,37 @@ class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: Anal
       }
     }
   }
+}
+
+
+class SeriesExtractRegressorsAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
+    extends SeriesRegressionAnalysis(tssc, params) with NikitaPreprocessing {
 
   override def analyze(data: StreamingSeries): StreamingSeries = {
     super.analyze(data)
 
-    // First, make sure the data is properly ordered in time
-    val orderedData = StreamingTimeSeries.fromStreamingSeries(data).toStreamingSeries
+    val preprocessedData = preprocessBehaviors(data, selectedKeys)
+
+    val keySet = featureKeys.toSet[Int]
+    preprocessedData.filterOnKeys(keySet.contains(_))
+  }
+}
+
+
+class SeriesLinearRegressionAnalysis(tssc: ThunderStreamingContext, params: AnalysisParams)
+    extends SeriesRegressionAnalysis(tssc, params) with NikitaPreprocessing {
+
+  override def analyze(data: StreamingSeries): StreamingSeries = {
+    super.analyze(data)
 
     // For Nikita's case, convolve the behavioral variables with a difference of exponentials filter
     //val count = getSingleRecordCount(data)
-    val preprocessedData = preprocessBehaviors(orderedData, selectedKeys)
+    val preprocessedData = preprocessBehaviors(data, selectedKeys)
     //val preprocessedData = data
 
     val regressionStream = StatefulLinearRegression.run(preprocessedData, featureKeys, selectedKeys)
-    regressionStream.checkpoint(orderedData.interval)
-    val outputStream = regressionStream.map{ case (k, model) => (k, (model.r2 +: model.normalizedBetas)) }
+    regressionStream.checkpoint(data.interval)
+    val outputStream = regressionStream.map{ case (k, model) => (k, (model.r2 +: model.weights)) }
     outputStream.map{ case (k,v) => (k, v.mkString(",")) }.print()
     new StreamingSeries(outputStream)
   }

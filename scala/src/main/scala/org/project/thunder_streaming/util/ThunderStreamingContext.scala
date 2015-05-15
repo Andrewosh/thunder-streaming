@@ -21,7 +21,7 @@ class ThunderStreamingContext(val ssc: StreamingContext) {
   def loadStreamingSeries(
       dataPath: String,
       inputFormat: String,
-      dataType: String = "short"): StreamingSeries = {
+      dataType: String = "u_short"): StreamingSeries = {
 
     val loader = new StreamingSeriesLoader(ssc)
 

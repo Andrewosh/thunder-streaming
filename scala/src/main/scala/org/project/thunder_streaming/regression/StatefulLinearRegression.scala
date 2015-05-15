@@ -20,13 +20,12 @@ import scala.util.{Try, Success}
 /** Class for representing parameters and sufficient statistics for a running linear regression model */
 class FittedModel(
    var count: Double,
-   var mean: Double, var sumOfSquaresTotal: Double,
+   var mean: Double,
+   var sumOfSquaresTotal: Double,
    var sumOfSquaresError: Double,
    var XX: DoubleMatrix2D,
    var Xy: DoubleMatrix1D,
-   var beta: DoubleMatrix1D,
-   var betaMins: Array[Double],
-   var betaMaxes: Array[Double]) extends Serializable {
+   var beta: DoubleMatrix1D) extends Serializable {
 
   def variance = sumOfSquaresTotal / (count - 1)
 
@@ -37,9 +36,6 @@ class FittedModel(
   def intercept = beta.toArray()(0)
 
   def weights = beta.toArray.drop(1)
-
-  def normalizedBetas = beta.toArray().zipWithIndex.map{ case (b, idx) => (b - betaMins(idx)) / (betaMaxes(idx) - betaMins(idx)) }
-
 }
 
 /**
@@ -103,9 +99,7 @@ class StatefulLinearRegression (
 
     val updatedState = state.getOrElse(new FittedModel(0.0, 0.0, 0.0, 0.0,
       DoubleFactory2D.dense.make(n, n), DoubleFactory1D.dense.make(n),
-      DoubleFactory1D.dense.make(n),
-      Array.fill(n)(Double.MaxValue),
-      Array.fill(n)(Double.MinValue)))
+      DoubleFactory1D.dense.make(n)))
 
     if ((currentCount != 0) & (batchNumFeatures != 0)) {
 
@@ -132,8 +126,6 @@ class StatefulLinearRegression (
       val oldXy = updatedState.Xy.copy
       val oldXX = updatedState.XX.copy
       val oldBeta = updatedState.beta
-      val oldMins = updatedState.betaMins
-      val oldMaxes = updatedState.betaMaxes
 
       // compute current estimates of all statistics
       val currentMean = y.foldLeft(0.0)(_ + _) / currentCount
@@ -145,34 +137,27 @@ class StatefulLinearRegression (
       val newXX = oldXX.copy.assign(currentXX, plus)
       val newXy = updatedState.Xy.copy.assign(currentXy, plus)
 
-      // Inverting the XX matrix will fail if the matrix is singular, in which just return oldBeta
-      val invertedXX = Try(inverse(newXX))
-      val newBeta = invertedXX match {
-        case Success(inv) => mult(inv, newXy)
-        case _ => oldBeta
-      }
+      try {
+        val newBeta = mult(inverse(newXX), newXy)
 
-      // compute terms for update equations
-      val delta = currentMean - oldMean
-      val term1 = ymat.copy.assign(mult(X, newBeta), minus).assign(bindArg2(pow, 2)).zSum
-      val term2 = mult(mult(oldXX, newBeta), newBeta)
-      val term3 = mult(mult(oldXX, oldBeta), oldBeta)
-      val term4 = 2 * mult(oldBeta.copy.assign(newBeta, minus), oldXy)
+        // compute terms for update equations
+        val delta = currentMean - oldMean
+        val term1 = ymat.copy.assign(mult(X, newBeta), minus).assign(bindArg2(pow, 2)).zSum
+        val term2 = mult(mult(oldXX, newBeta), newBeta)
+        val term3 = mult(mult(oldXX, oldBeta), oldBeta)
+        val term4 = 2 * mult(oldBeta.copy.assign(newBeta, minus), oldXy)
 
-      // update the all statistics of the fitted model
-      updatedState.count += currentCount
-      updatedState.mean += (delta * currentCount / (oldCount + currentCount))
-      updatedState.Xy = newXy
-      updatedState.XX = newXX
-      updatedState.beta = newBeta
-      updatedState.sumOfSquaresTotal += currentSumOfSquaresTotal +
-        delta * delta * (oldCount * currentCount) / (oldCount + currentCount)
-      updatedState.sumOfSquaresError += term1 + term2 - term3 + term4
-
-      // update the ranges of the betas
-      for (i <- 0 until nBatch) {
-        updatedState.betaMins(i) = min(oldMins(i), newBeta.get(i))
-        updatedState.betaMaxes(i) = max(oldMaxes(i), newBeta.get(i))
+        // update the all statistics of the fitted model
+        updatedState.count += currentCount
+        updatedState.mean += (delta * currentCount / (oldCount + currentCount))
+        updatedState.Xy = newXy
+        updatedState.XX = newXX
+        updatedState.beta = newBeta
+        updatedState.sumOfSquaresTotal += currentSumOfSquaresTotal +
+          delta * delta * (oldCount * currentCount) / (oldCount + currentCount)
+        updatedState.sumOfSquaresError += term1 + term2 - term3 + term4
+      } catch  {
+        case e: Exception => {}
       }
     }
     Some(updatedState)
