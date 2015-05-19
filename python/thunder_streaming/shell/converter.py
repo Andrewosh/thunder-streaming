@@ -68,8 +68,8 @@ class DataProxy(object):
     def update_reference(self, data_obj):
         self.data_obj = data_obj
 
-    def handle_new_data(self, root, new_data):
-        self.data_obj.handle_new_data(root, new_data)
+    def handle_new_data(self, new_data):
+        self.data_obj.handle_new_data(new_data)
 
 
 class Data(object):
@@ -129,9 +129,23 @@ class Data(object):
     def identifier(self):
         return self.__class__.__name__
 
+    @staticmethod
     @abstractmethod
-    def _convert(self, root, new_data):
+    def convert(new_data):
+        """ 
+        Converts new_data (a dict of raw bytes) into a numpy array of the correct format according to the data type
+
+        @staticmethod so that conversions can be consolidated if there are multiple converters of the same type 
+        for a given Analysis
+        """
         return None
+
+    @abstractmethod
+    def postprocess(self, new_data): 
+        """ 
+        Do any instance-specific post-conversion steps here (necessary because convert is a static method)
+        """ 
+        pass
 
     def _propagate_values(self, other, **kwargs):
         for key, value in vars(self).items():
@@ -142,9 +156,9 @@ class Data(object):
     def set_proxy(self, proxy):
         self.proxy = proxy
 
-    def handle_new_data(self, root, new_data):
-        converted = self._convert(root, new_data)
-        transformed = converted
+    def handle_new_data(self, new_data):
+        # new_data has already been converted inside Analysis.handle_new_data
+        transformed = self.postprocess(converted)
         for func in self.transformation_funcs:
             transformed = func(transformed)
         for func in self.output_funcs.values():
@@ -155,7 +169,6 @@ class Data(object):
 
     def stop(self):
         self.analysis.stop()
-
 
 # Some example Converters for StreamingSeries
 
@@ -173,12 +186,12 @@ class Series(Data):
 
     @staticmethod
     @Data.converter
-    def toSeries(analysis):
+    def toSeries(analysis, index=None):
         """
         :param analysis: The analysis whose raw output will be parsed and converted into an in-memory series
         :return: A DataProxy pointing to a Series object
         """
-        series = Series(analysis)
+        series = Series(analysis, index=index)
         return DataProxy(series)
 
     def toImage(self, **kwargs):
@@ -194,9 +207,10 @@ class Series(Data):
         self.proxy.update_reference(image)
         return image
 
-    def _get_dims(self, root):
+    @staticmethod
+    def _get_dims(new_data):
         try:
-            dims = open(os.path.join(root, Series.DIMS_FILE_NAME), 'r')
+            dims = new_data.get(Series.DIMS_FILE_NAME)
             dims_json = json.load(dims)
             record_size = int(dims_json[self.RECORD_SIZE])
             dtype = dims_json[self.DTYPE]
@@ -205,10 +219,6 @@ class Series(Data):
             print "Cannot load binary series: %s" % str(e)
             return None, None
 
-    def _loadBinaryFromPath(self, p, dtype):
-        fbuf = open(p, 'rb').read()
-        return fbuf
-
     def _saveBinaryToPath(self, p, data):
         print "In _saveBinaryToPath, saving to: %s" % p
         if data is None or len(data) == 0:
@@ -216,7 +226,8 @@ class Series(Data):
         with open(p, 'w+') as f:
             f.write(data)
 
-    def _convert(self, root, new_data):
+    @staticmethod
+    def convert(new_data):
 
         num_output_files = len(new_data) - 1
 
@@ -227,23 +238,28 @@ class Series(Data):
             return num_output_files
 
         # Load in the dimension JSON file (which we assume exists in the results directory)
-        record_size, dtype = self._get_dims(root)
+        record_size, dtype = Series._get_dims(new_data)
         if not record_size or not dtype:
             return None
         self.dtype = dtype
 
-        without_dims = filter(lambda x: not self.DIMS_PATTERN.search(x), new_data)
+        without_dims = filter(lambda x: not Series.DIMS_PATTERN.search(x), new_data)
         sorted_files = sorted(without_dims, key=get_partition_num)
         bytes = ''
         for f in sorted_files:
-            series = self._loadBinaryFromPath(f, dtype)
+            series = new_data[f]
             bytes = bytes + series
         merged_series = np.frombuffer(bytes, dtype=dtype)
         reshaped_series = merged_series.reshape(-1, record_size)
-
+    
+    def postprocess(self, converted): 
+        reshaped_series = converted 
         if self.index:
             # Slice out the relevant values from the reshaped series
             reshaped_series = reshaped_series[:, self.index]
+
+        if len(reshaped_series) > 2: 
+            print "In Series.convert, first 2 elements: %s" % str(reshaped_series[:2])
 
         return reshaped_series
 
@@ -265,16 +281,30 @@ class Series(Data):
         overwritten.
         """
         # TODO implement saving with keys as well
-        if path:
+        if data is None: 
+            return
+        if path and len(data) > 0:
             fullPath = path if not prefix else path + '-' + str(time.time())
             fullPath = fullPath + '.' + fileType
             if fileType == 'bin':
                 self._saveBinaryToPath(fullPath, data)
             elif fileType == 'tif':
-                imsave(fullPath, data)
+                imsave(fullPath, data, bigtiff=True)
         else:
-            print "Path not specified in toFile."
+            print "Path or data not specified in toFile."
 
+    @Data.transformation
+    def apply(self, data, func=None): 
+        return func(data)
+
+    @Data.transformation
+    def getRegressors(self, data, num_regressors=None): 
+        if data is None or len(data) == 0 or not num_regressors:
+            return
+        print "In getRegressors, data.shape: %s" % str(data.shape)
+        regressors = data[-num_regressors:]
+        return regressors
+        
 
 class MultiValue(Series):
     """
@@ -293,8 +323,7 @@ class Image(Series):
     """
     Represents a 2 or 3 dimensional image
     """
-
-    def __init__(self, analysis, dims, preslice):
+    def __init__(self, analysis, dims=None, preslice=None):
         Series.__init__(self, analysis)
         self.dims = dims
         self.preslice = preslice
@@ -306,59 +335,77 @@ class Image(Series):
         :param analysis: The analysis whose raw output will be parsed and converted into an in-memory image
         :return: An Image object
         """
-        image = Image(analysis, dims, preslice)
+        image = Image(analysis, dims=dims, preslice=preslice)
         return DataProxy(image)
 
-    def _convert(self, root, new_data):
-        series = Series._convert(self, root, new_data)
+    @staticmethod
+    def convert(new_data):
+        return Series.convert(new_data)
+
+    def postprocess(self, series): 
         if series is not None and len(series) != 0:
             # Remove the regressors
             if self.preslice:
                 series = series[self.preslice]
             # Sort the keys/values
             print "series.shape: %s" % str(series.shape)
-            image_arr = series.reshape(self.dims)
+            image_arr = series.reshape(self.dims, order='C')
             print "_convert returning array of shape %s" % str(image_arr.shape)
             return image_arr
 
     @Data.transformation
     def downsample(self, data, factor=4):
         curData = data
-        numDims = len(data.shape)
         for idx, dim in enumerate(data.shape):
-            curData = decimate(curData, int(max(1, ceil(factor ** (1.0 / numDims)))), axis=idx)
+            curData = decimate(curData, int(max(1, ceil(factor ** (1.0 / data.ndim)))), axis=idx)
         return curData
 
     @Data.transformation
-    def colorize(self, data, cmap="rainbow", scale=1, vmin=0, vmax=30):
+    def colorize(self, data, cmap="hsv", scale=1, vmin=0, vmax=30, mask_with_first=False, threshold=0.05):
         if data is None or len(data) == 0:
             return None
         print "In colorize, data.shape: %s" % str(data.shape)
-        return Colorize(cmap=cmap, scale=scale, vmin=vmin, vmax=vmax).transform(data)
+        mask_img = None
+        # TODO: This should ideally accept any index as a mask 
+        if mask_with_first: 
+            mask_img = data[0, ...]
+            mask_img = mask_img > threshold
+            data = data[1:, ...]
+        return Colorize(cmap=cmap, scale=scale, vmin=vmin, vmax=vmax).transform(data, mask=mask_img)
 
     @Data.transformation
     def getPlane(self, data, plane):
         if data is None or len(data) == 0:
             return None
-        return data[plane, :, :]
+        if data.ndim == 3: 
+            return data[plane, :, :]
+        else: 
+            # Assume the first dimension is the value per pixel 
+            return data[:, plane, ...]
 
     @Data.transformation
     def clip(self, data, min, max):
         if data is None or len(data) == 0:
-            return
+            return None
         return data.clip(min, max)
 
     @Data.transformation
-    def maxProject(self, data, axis=0):
-        return max(data, axis=axis, keepdims=True)
+    def normalize(self, data): 
+        """ 
+        How to do this without computing expensive statistics in the driver? 
+        Need to use the results of a streaming analysis? 
+        """ 
+        pass
+
+    @Data.transformation
+    def maxProject(self, data, axis=0, keepdims=True):
+        if data is None or len(data) == 0: 
+            return None
+        return max(data, axis=axis, keepdims=keepdims)
 
     @Data.output
     def toLightning(self, data, image_viz, image_dims, only_viz=False):
         if data is None or len(data) == 0:
-            return
-        print "In toLightning..., data.shape: %s" % str(data.shape)
-        if len(self.dims) > 3 or len(self.dims) < 1:
-            print "Invalid images dimensions (must be < 3 and >= 1)"
             return
         print "Sending data with dims: %s to Lightning" % str(data.shape)
         if only_viz:

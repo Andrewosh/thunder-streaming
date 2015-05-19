@@ -1,4 +1,5 @@
 from thunder_streaming.shell.analysis import Analysis
+from thunder_streaming.shell.file_monitor import FileMonitor
 from thunder_streaming.shell.param_listener import ParamListener
 from thunder_streaming.shell.message_proxy import MessageProxy
 from thunder_streaming.shell.settings import *
@@ -113,17 +114,15 @@ class ThunderStreamingContext(ParamListener):
     def get_message_proxy(self):
         return self.message_proxy
 
-    def _reset_document(self):
-        # Document that will contain the XML specification
-        self.doc = ET.ElementTree(ET.Element("analyses"))
-        self._write_document()
-
     def _reinitialize(self):
 
         self._update_env()
 
         # The child process has not been created yet
         self.streamer_child = None
+
+    def _reset_document(self): 
+        self._write_document()
 
     def _update_env(self):
         for (name, value) in self.run_parameters.items():
@@ -155,6 +154,8 @@ class ThunderStreamingContext(ParamListener):
 
     def _write_document(self):
 
+        doc = ET.ElementTree(ET.Element("analyses"))
+
         def build_params(parent, param_dict):
             for (name, value) in param_dict.items():
                 # Shortest way to do this
@@ -165,9 +166,10 @@ class ThunderStreamingContext(ParamListener):
                     param_elem.set("value", v)
 
 
+        print "In _write_document, self.analysis: %s" % str(self.analyses)
         for analysis in self.analyses.values():
 
-            analysis_elem = ET.SubElement(self.doc.getroot(), "analysis")
+            analysis_elem = ET.SubElement(doc.getroot(), "analysis")
             name_elem = ET.SubElement(analysis_elem, "name")
             name_elem.text = analysis.full_name
             build_params(analysis_elem, analysis.get_parameters())
@@ -175,7 +177,7 @@ class ThunderStreamingContext(ParamListener):
         # Write the configuration to a temporary file and record the name
         temp = NamedTemporaryFile(delete=False)
         self.config_file = temp
-        self.doc.write(temp)
+        doc.write(temp)
         temp.flush()
         self.set_config_file_path(temp.name)
 
@@ -257,8 +259,7 @@ class ThunderStreamingContext(ParamListener):
         self.feeder_child = Popen(cmd)
 
     def _start_analyses(self):
-        for analysis in self.analyses.values():
-            analysis.start()
+        FileMonitor.start()
 
     def _start_updaters(self):
         for updater in self.updaters:
@@ -273,8 +274,8 @@ class ThunderStreamingContext(ParamListener):
         base_args = [spark_path, "--jars",
                      ",".join([os.path.join(THUNDER_STREAMING_PATH, "scala/project/lib/jeromq-0.3.4.jar"),
                      os.path.join(THUNDER_STREAMING_PATH, "scala/project/lib/spray-json_2.10-1.3.1.jar"),
-                     os.path.join(THUNDER_STREAMING_PATH, "scala/project/lib/colt-1.2.0.jar")]),
-                     os.path.join(THUNDER_STREAMING_PATH, "scala/project/lib/breeze-parent_2.11-0.12-SNAPSHOT.jar"),
+                     os.path.join(THUNDER_STREAMING_PATH, "scala/project/lib/colt-1.2.0.jar"),
+                     os.path.join(THUNDER_STREAMING_PATH, "scala/project/lib/breeze_2.10-0.11.2.jar")]),
                      "--class", "org.project.thunder_streaming.util.launch.Launcher", full_jar]
         self.streamer_child = Popen(base_args)
 

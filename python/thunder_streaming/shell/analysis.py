@@ -1,10 +1,10 @@
 from thunder_streaming.shell.mapped_scala_class import MappedScalaClass
 from thunder_streaming.shell.param_listener import ParamListener
+from thunder_streaming.shell.file_monitor import FileMonitor
 import settings
-from threading import Thread
+from multiprocessing import Pool
 import time
 import os
-
 
 class Analysis(MappedScalaClass, ParamListener):
     """
@@ -20,80 +20,8 @@ class Analysis(MappedScalaClass, ParamListener):
     # Necessary Analysis parameters
     OUTPUT = "output"
 
-    class FileMonitor(Thread):
-        """
-        Monitors an Analysis' output directory and periodically sends the entire output from a single timepoint to all
-        converters registered on that Analysis
-        """
-
-        # Period with which the FileMonitor will check for new data directories
-        DIR_POLL_PERIOD = 1
-        # Period with which the FileMonitor will check monitored directories for new files
-        FILE_POLL_PERIOD = 5
-        # Time between each poll
-        WAIT_PERIOD = 0.5
-
-        def __init__(self, analysis):
-            Thread.__init__(self)
-            self.output_dir = analysis.get_output_dir()
-            self.outputs = analysis.get_outputs()
-            self._stopped = False
-
-            # Fields involved in directory monitoring
-            self._last_dir_state = None
-            cur_time = time.time()
-            self.last_dir_poll = cur_time
-
-            # A dict of 'dir_name' -> (last_state, last_mod_time)
-            self.monitored_dirs = {}
-
-        def stop(self):
-            self._stopped = True
-
-        def _start_monitoring(self, diff):
-            for dir in diff:
-                self.monitored_dirs[dir] = (diff, time.time())
-
-        def _qualified_dir_set(self, root):
-            if not root:
-                return None
-            return set([os.path.join(root, f) for f in os.listdir(root)])
-
-        def _qualified_file_set(self, root):
-            def path_and_size(f):
-                path = os.path.join(root, f)
-                size = os.path.getsize(path)
-                return (path, size)
-            if not root:
-                return None
-            return set([path_and_size(f) for f in os.listdir(root)])
-
-        def run(self):
-            while not self._stopped:
-                cur_time = time.time()
-                dp = cur_time - self.last_dir_poll
-                if dp > self.DIR_POLL_PERIOD:
-                    cur_dir_state = self._qualified_dir_set(self.output_dir)
-                    if cur_dir_state != self._last_dir_state:
-                        if self._last_dir_state != None:
-                            diff = cur_dir_state.difference(self._last_dir_state)
-                            self._start_monitoring(diff)
-                        self._last_dir_state = cur_dir_state
-                    self.last_dir_poll = cur_time
-                for dir, info in self.monitored_dirs.items():
-                    dir_state = self._qualified_file_set(dir)
-                    if info[0] != dir_state:
-                        self.monitored_dirs[dir] = (dir_state, time.time())
-                    elif info[0]:
-                        # Only want to get to this point if the directory is not empty
-                        if (time.time() - info[1]) > self.FILE_POLL_PERIOD:
-                            # The directory has remained the same for a sufficient period of time
-                            only_names = map(lambda x: x[0], dir_state)
-                            for output in self.outputs:
-                                output.handle_new_data(dir, only_names)
-                            del self.monitored_dirs[dir]
-                time.sleep(self.WAIT_PERIOD)
-
+    NUM_CHILD_PROCS = 5
+    POOL = Pool(NUM_CHILD_PROCS)
 
     def __init__(self, identifier, full_name, param_dict):
         super(Analysis, self).__init__(identifier, full_name, param_dict)
@@ -106,7 +34,7 @@ class Analysis(MappedScalaClass, ParamListener):
         # @converter decorator
         self.outputs = []
 
-        self.file_monitor = Analysis.FileMonitor(self)
+        self.file_monitor = FileMonitor.getInstance(self)
 
         # Put the address of the subscription forwarder into the parameters dict
         self._param_dict[Analysis.FORWARDER_ADDR_PARAM] = "tcp://" + settings.MASTER  + ":" + str(settings.PUB_PORT)
@@ -120,6 +48,29 @@ class Analysis(MappedScalaClass, ParamListener):
 
     def add_output(self, output):
         self.outputs[output.identifier] = output
+
+    def handle_new_data(self, data): 
+        """
+        Called by this Analysis' FileMonitor, handle_new_data takes a loaded batch of data (in dict form), 
+        converts it according to the Converter.convert functions of its Converters, and then passes it to 
+        the Analysis' outputs.
+        """
+
+        # Do all base conversions (conversions that can be shared across all instances of a particular data type, i.e.
+        # the Series conversion)
+        data_types = set()
+        for proxy in self.outputs: 
+            data_types.add(proxy.data_obj.__class__)
+        converted = {}
+        for data_type in data_types: 
+            converted[data_type.__name__] = data_type.convert(data)
+
+        # Pass the initial conversion results into instance-specific postprocessing
+        def postprocess_then_output(converter, data): 
+            converter_type = converter.data_obj.__class__
+            converter.handle_new_data(converted[converter_type.__name__])
+            
+        Analysis.POOL.map(postprocess_then_output, self.outputs)
 
     def receive_updates(self, analysis):
         """
