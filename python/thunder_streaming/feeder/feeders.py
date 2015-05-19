@@ -321,7 +321,7 @@ class SyncCopyAndMoveFeeder(CopyAndMoveFeeder):
 
 class SyncSeriesFeeder(SyncCopyAndMoveFeeder):
     """A Feeder implementation that looks for matching pairs of files, as in SyncCopyAndMoveFeeder, and
-    them writes out these matching pairs as a single Series binary file.
+    then writes out these matching pairs as a single Series binary file.
 
     Expected file prefixes must be given at object construction. The Series data will be written out
     in the order given by this prefixes argument - so for instance in order to write out behavioral data
@@ -345,6 +345,8 @@ class SyncSeriesFeeder(SyncCopyAndMoveFeeder):
         self.dtype = dtype
         self.indtype = indtype
 
+        self.batch_num = 0
+
     def get_series_filename(self, srcfilenames, bytesize):
         startcount = self.fname_to_timepoint_fcn(os.path.basename(srcfilenames[0]))
         endcount = self.fname_to_timepoint_fcn(os.path.basename(srcfilenames[-1]))
@@ -364,7 +366,7 @@ class SyncSeriesFeeder(SyncCopyAndMoveFeeder):
                     curnames.sort()
                     ninput_files = len(curnames)  # should be same for all prefixes
                     if (not self.linear) and (self.shape is None):
-                        nindices_written += transpose_files(curnames, tmpfp, dtype=self.dtype)
+                        nindices_written += transpose_files(curnames, tmpfp, self.batch_num, dtype=self.dtype)
                     elif self.linear:
                         nindices_written += transpose_files_to_linear_series(curnames, tmpfp,
                                                                              dtype=self.dtype, indtype=self.indtype,
@@ -375,7 +377,8 @@ class SyncSeriesFeeder(SyncCopyAndMoveFeeder):
                                                                       startlinidx=nindices_written)
                 tmpfp.close()
 
-                record_vals_size = ninput_files * np.dtype(self.dtype).itemsize
+                # ninput_files + 1 because of the batch number index
+                record_vals_size = (ninput_files + 1) * np.dtype(self.dtype).itemsize
                 if self.linear:
                     recordsize = np.dtype(self.dtype).itemsize + record_vals_size
                 elif self.shape:
@@ -392,4 +395,5 @@ class SyncSeriesFeeder(SyncCopyAndMoveFeeder):
                     tmpfp.close()
                 if os.path.isfile(tmpfname):
                     os.remove(tmpfname)
+        self.batch_num += 1
         return fullnames
